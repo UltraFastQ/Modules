@@ -237,7 +237,7 @@ def ezdiff(x, y, n = 1, order = 2):
     determines the order of the finite difference formula; it must be an even
     number greater than 0. High values of order can help precision or lead to 
     significant numerical errors, depending on the situation. x needs to increase
-    monotonically in constant increments dx.
+    monotonically in constant increments dx. 
     """
     
     import numpy as np    # Fast numerical operations
