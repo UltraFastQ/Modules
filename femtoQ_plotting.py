@@ -127,7 +127,7 @@ def set_default_values_presentation():
     rcParams['font.serif'] = ['Times New Roman']
     rcParams['font.size'] = 18
     rcParams['axes.linewidth'] = 2
-    rcParams['figure.dpi'] = 100
+    #rcParams['figure.dpi'] = 100
     rcParams['lines.linewidth'] = 2
     rcParams['xtick.top'] = True
     rcParams['ytick.right'] = True
