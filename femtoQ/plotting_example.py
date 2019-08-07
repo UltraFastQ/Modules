@@ -8,7 +8,7 @@ Created on Mon Dec 10 13:48:34 2018
 import sys
 import numpy as np
 sys.path.append('../')
-import femtoQ_plotting as fqp
+import plotting as fqp
 
 figure_number = 1
 figure_size = (18, 8) # in cm, for presentation 16:9 the size is 33.8:19
