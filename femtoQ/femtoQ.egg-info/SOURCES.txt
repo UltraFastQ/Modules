@@ -1,6 +1,0 @@
-README.md
-setup.py
-femtoQ.egg-info/PKG-INFO
-femtoQ.egg-info/SOURCES.txt
-femtoQ.egg-info/dependency_links.txt
-femtoQ.egg-info/top_level.txt
