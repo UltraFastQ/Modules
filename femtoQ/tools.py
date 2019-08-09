@@ -5,8 +5,6 @@ Created on Mon Dec  3 16:18:05 2018
 @author: Etien & Patr & Benjm
 """
 
-print('a')
-
 #%% Import modules
 import numpy as np
 import csv
