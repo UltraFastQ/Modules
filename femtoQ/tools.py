@@ -488,6 +488,18 @@ class Pulse:
             return None
 
 
+    def delay(self, timeDelay):
+        """
+        Delay the pulse in time domain by a value equal to timeDelay. Does not wrap it back once it reaches the
+        end of time vector t. A positive delay means the pulse's peak will shift towards negative time values.
+        """
+        
+        newEfield = np.interp(self.t, self.t - timeDelay, self.E)
+        
+        newPulse = Pulse(t = self.t, E = newEfield)
+        
+        return newPulse
+
 
 
 
