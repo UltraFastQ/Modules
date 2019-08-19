@@ -9,10 +9,15 @@ Created on Mon Dec  3 16:18:05 2018
 import numpy as np
 import csv
 import math
-
+import scipy.constants as sc
+import matplotlib.pyplot as plt
+import scipy as sp
+from scipy.optimize import curve_fit
+import femtoQ.plotting as fqp
+fqp.set_default_values_presentation()
 #%% Set constants and recurrant functions
-C = 2.998e8                       # Speed of light
-pi = np.pi                        # Pi
+C = sc.c                          # Speed of light
+pi = sc.pi                        # Pi
 sqrt = lambda x: np.sqrt(x)       # Square root
 log = lambda x: np.log(x)         # Natural logarithm
 exp = lambda x: np.exp(x)         # Exponential
@@ -298,10 +303,54 @@ def ezdiff(x, y, n = 1, order = 2):
 
     return xtrunc, deriv
 
+def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
+    """
+    z in mm
+    """
+    if z is None or P is None:
+        print('Position or power array is missing')
+        return
+    
+    if type(z) != np.ndarray or type(P) != np.ndarray:
+        print('z and P must be numpy arrays')
+        return
+    
+    if len(P) != len(z):
+        print('z and P must be the same length')
+        return
+    
+    # Defining error function
+    if P_max:
+        def func(z, z0, w):
+            return P0 + 0.5*P_max*(1-sp.special.erf(np.sqrt(2) * (z -z0)/w))
+        # Fit an error function on the data
+        params, param_covar = curve_fit(func, z, P)
+        z_fit = np.linspace(3, 11, 100)
+        P_fit = func(z_fit, params[0], params[1])
+    else:
+        def func(z, z0, w, P_max):
+            return P0 + 0.5*P_max*(1-sp.special.erf(np.sqrt(2) * (z -z0)/w))
+        # Fit an error function on the data
+        params, param_covar = curve_fit(func, z, P, bounds=(0, [np.max(z), np.max(z), np.max(P)]))
+        z_fit = np.linspace(3, 11, 100)
+        P_fit = func(z_fit, params[0], params[1], params[2])
+        print('The fitted max power is: ' + str(params[2]))
+    
+    print('The beam diameter (1/e^2) is: ' + str(2*params[1]) + ' mm')
+    
+    # Plotting
+    plt.figure
+    plt.plot(z,P, 'o', label = 'Measured')
+    plt.plot( z_fit, P_fit, label = 'Fitted')
+    plt.xlabel('Razor edge position (mm)')
+    plt.ylabel('Average power (mW)')
+    if P_max:
+        plt.ylim([0,1.05*P_max])
+    else:
+        plt.ylim([0,1.05*params[2]])
+    plt.legend()
 
-
-
-
+    plt.show()
 
 class Pulse:
     """
