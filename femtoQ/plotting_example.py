@@ -7,6 +7,7 @@ Created on Mon Dec 10 13:48:34 2018
 
 import sys
 import numpy as np
+import np.matlib
 sys.path.append('../')
 import femtoQ.plotting as fqp
 
