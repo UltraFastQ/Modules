@@ -7,14 +7,14 @@ Created on Mon Dec 10 13:48:34 2018
 
 import sys
 import numpy as np
-import np.matlib
+import numpy.matlib as matlib
 sys.path.append('../')
 import femtoQ.plotting as fqp
 
 figure_number = 1
 figure_size = (18, 8) # in cm, for presentation 16:9 the size is 33.8:19
 axis_pos = fqp.generate_rectangular_axes_pos((.11, .6), (.21))
-axis_size = np.matlib.repmat((.35, .6), 2, 1)
+axis_size = matlib.repmat((.35, .6), 2, 1)
 axis_xlim = ([-10, 700], [1,2])
 axis_ylim = ([-1.2, 1.5], [0,3])
 axis_xlabel = ('time delay $t_d$ (fs)', 'energy (eV)')
