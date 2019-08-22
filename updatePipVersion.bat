@@ -22,3 +22,5 @@ echo Upload to PyPi
 twine upload dist/*
 
 echo Done!
+
+PAUSE
