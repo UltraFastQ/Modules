@@ -5,7 +5,7 @@ Created on Mon Dec  3 16:18:05 2018
 @author: Etien & Patr & Benjm
 """
 
-#%% Import modules
+#%% Imported modules
 import numpy as np
 import csv
 import math
@@ -13,8 +13,8 @@ import scipy.constants as sc
 import matplotlib.pyplot as plt
 import scipy as sp
 from scipy.optimize import curve_fit
-import femtoQ.plotting as fqp
-fqp.set_default_values_presentation()
+
+
 #%% Set constants and recurrant functions
 C = sc.c                          # Speed of light
 pi = sc.pi                        # Pi
@@ -307,6 +307,9 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
     """
     z in mm
     """
+    import femtoQ.plotting as fqp
+    fqp.set_default_values_presentation()
+    
     if z is None or P is None:
         print('Position or power array is missing')
         return
