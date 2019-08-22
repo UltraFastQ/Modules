@@ -33,15 +33,17 @@ from numpy import exp         # Exponential
 def ezfft(t, S, normalization = "ortho", neg = False):
     """ 
     Description: Returns the Fourier transform of S and the frequency vector associated with it
+    
     Inputs:
         - t: array_like
             Time vector [seconds]
         - S: array_like
             Signal vector [arb.u.]
-        - normalization: str, optionnal
+        - normalization: str, optional
             Type of normalization for fft algorithm. For more info, see https://docs.scipy.org/doc/numpy/reference/routines.fft.html#module-numpy.fft
         - neg: bool, optional
             Choose whether or not to include negative frequencies components in output.
+    
     Outputs:
         - f: ndarray
             Frequency vector [Hz]
@@ -62,19 +64,22 @@ def ezfft(t, S, normalization = "ortho", neg = False):
 def ezifft(f, y, normalization = "ortho"):
     """
     Description: Returns the inverse Fourier transform of y and the time vector associated with it.
+    
     Inputs:
         - f: array_like
             Frequency vector [Hz]
         - y: array_like
             Complex amplitude vector [arb. u.]
-        - normalization: str, optionnal
+        - normalization: str, optional
             Type of normalization for fft algorithm. For more info, see https://docs.scipy.org/doc/numpy/reference/routines.fft.html#module-numpy.fft
+    
     Outputs:
         - t: array_like
             Time vector [seconds]
         - S: array_like
             Signal vector [arb.u.] 
-    Other comments: Negative frequencies components should be included in f and y vectors. 
+    
+    Other comments: Negative frequencies components should be included in f and y vectors. Add them manually if needed. 
     """
     N = len(f)
     tstep = 1/(N*(f[2]-f[1]))
@@ -87,33 +92,26 @@ def ezifft(f, y, normalization = "ortho"):
 
 
 
-def ezsmooth(x,window_len=11,window='flat'):
-     """smooth the data using a window with requested size.
+def ezsmooth(x, window_len=11, window='flat'):
+     """
+     Description: Smooth the data using a window with requested size.
+         This method is based on the convolution of a scaled window with the signal.
+         The signal is prepared by introducing reflected copies of the signal
+         (with the window size) in both ends so that transient parts are minimized
+         in the begining and end part of the output signal.
 
-     This method is based on the convolution of a scaled window with the signal.
-     The signal is prepared by introducing reflected copies of the signal
-     (with the window size) in both ends so that transient parts are minimized
-     in the begining and end part of the output signal.
+     Inputs:
+         - x: array_like
+             Input signal to smooth
+         - window_len: int, optional
+             The dimension of the smoothing window; should be an odd integer
+         - window: str, optional
+             The type of window used, can be any from 'flat', 'hanning', 'hamming', 'bartlett' or 'blackman'.
+             "flat" window will produce a moving average smoothing.
 
-     input:
-         x: the input signal
-         window_len: the dimension of the smoothing window; should be an odd integer
-         window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
-             flat window will produce a moving average smoothing.
-
-     output:
-         the smoothed signal
-
-     example:
-
-     t=linspace(-2,2,0.1)
-     x=sin(t)+randn(len(t))*0.1
-     y=smooth(x)
-
-     see also:
-
-     numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
-     scipy.signal.lfilter
+     Outputs:
+         - y: ndarray
+             Smoothed signal
      """
 
      if x.ndim != 1:
@@ -144,9 +142,27 @@ def ezsmooth(x,window_len=11,window='flat'):
 
 def ezcorr(x, y1, y2, unbiased=False, Norm=False, Mean = False):
 
-    '''Arguments : x, y1, y2, biased, norm
+    '''
+    Description: Returns the correlation between two vectors y1 and y2. Returns the autocorrelation if y1 = y2.
+    
+    Inputs: 
+        - x: array_like
+            time_like vector [arb.u.]
+        - y1: array_like
+            First signal vector [arb.u.]
+        - y2: array_like
+            Second signal vector [arb.u.]
+        - Bias: bool
+            Method for removing the bias
+        - Norm: bool
+            'Normalized' or 'coef' method 
+        - Mean: bool
+            Option to remove the mean of the signal before correlation
+            
     This function assumes the x arrays are the same, "unbiased" = True for an unbiased calculation and "Norm" = False to not normalize
-    One can not have "Norm" = True and "unbiased" = False'''
+    One can not have "Norm" = True and "unbiased" = False. For more information on unbiasing types, see: https://www.mathworks.com/help/matlab/ref/xcorr.html
+    '''
+    
     if Mean is True:
         y1 = y1-y1.mean()
         y2 = y2-y2.mean()
@@ -171,8 +187,28 @@ def ezcorr(x, y1, y2, unbiased=False, Norm=False, Mean = False):
 
 def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, outformat = 'array', skiprows = 0, profile = None):
     """
-    Function for easy loading of csv-type files. Loading parameters can be set manually,
-    or instruments-specific "profiles" can be called.
+    Description: Function for easy loading of csv-type files. Loading parameters can be set manually,
+        or instruments-specific "profiles" can be called. Returns a list of array_like data.
+    
+    Inputs:
+        - filename: str
+            Name of the file to load. If not in the same folder, include path.
+        - nbrcolumns: int, optional
+            Number of columns contained in the file
+        - delimiter: str, optional
+            Character separating elements of different columns
+        - decimalcomma: bool, optional
+            Indicate whether or not the file use a comma to identify decimals
+        - outformat: str, optional
+            If "array", convert lists containing data from each columns into numpy arrays
+        - skiprows: int, optional
+            If file contains a header, indicate how many rows it contains to skip them.
+        - profile: str, optional
+            Automatically set all other options to match file format of a specific instrument.
+            
+    Outputs:
+        - outlist: list
+            Data extracted from file. Each element in the list represents a column from the file.
 
     """
 
@@ -231,6 +267,22 @@ def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, 
 
 
 def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
+    """
+    Description: Function that finds the width of an input signal or pulse. By default, the FWHM will be returned, unless height 
+                 and/or halfwidth options are changed. 
+                 
+    Inputs: 
+        - x: array_like 
+            Abscissa. Width will be defined in the same units (time, frequency, wavelength, etc.) 
+        - y: array_like 
+            Signal/pulse to measure [arb. u.]
+        - halfwidth: bool, optional
+            If True, will return the halfwidth
+        - height: float, optional
+            Selects height for which width is calculated
+        - interp points: int, optionnal
+            Function will be interpolated to this number of points if the input has less points than this number
+    """
     # Ensure x is stricktly ascending
     IIsort = np.argsort(x)
     x = x[IIsort]
@@ -274,12 +326,26 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
 
 
 def ezdiff(x, y, n = 1, order = 2):
-    """ Numerical differentiation based on centered finite-difference formulas.
-    Outputs d^n/dx^n(y) and a appropriately truncated x vector. "order" parameter
-    determines the order of the finite difference formula; it must be an even
-    number greater than 0. High values of order can help precision or lead to
-    significant numerical errors, depending on the situation. x needs to increase
-    monotonically in constant increments dx.
+    """ 
+    Description: Numerical differentiation based on centered finite-difference formulas.
+    
+    Inputs: 
+        - x: array_like; increases monotically in constant increments dx
+            abscissa
+        - y: array_like
+            ordonate
+        - n: int
+            diffirentiates 'n' times
+        - order: 
+            "order" parameter determines the order of the finite difference formula; 
+            it must be an even number greater than 0. High values of order can help 
+            precision or lead to significant numerical errors, depending on the situation.
+            2 is usually a safe value.
+   Outputs:
+       - xtrunc: array_like
+           truncated abscissa
+       - deriv: array_like
+           nth derivative of y with respect to x.
     """
 
     # X increments
@@ -340,8 +406,27 @@ def ezdiff(x, y, n = 1, order = 2):
     return xtrunc, deriv
 
 def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
+    
     """
-    z in mm
+    Description: With the measured parameters from a knife edge experiment, finds the beam size
+                 by fitting a error function on the data. The function on which the data is fitted is the following:
+                 P0 + 0.5*P_max*( 1 - erf(sqrt(2)*(z -z0)/w) )
+                 z0 and w are the fitting parameters. P_max is also a fitting parameter if not specified as input.
+    
+    Inputs: 
+        - z: array_like
+            vector containing the positions of the stage [mm]
+        - P: array_like
+            Singal (power) vector corresponding to the stage positions [mW]
+        - P0: float, optionnal
+            Signal (power) in absence of the incident beam
+        - P_max: float, optional
+            Maximum signal (power). i.e. when the beam is not blocked. 
+            If P_max is not entered, the function will use it as another
+            fitting parameter and display the computed value.
+    Outputs:
+        - params: array
+            contains in that order: z0, w, P_max (if not specified as input)
     """
     import femtoQ.plotting as fqp
     fqp.set_default_values_presentation()
@@ -390,20 +475,60 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
     plt.legend()
 
     plt.show()
-
+    
+    # Returns
+    return params
+    
 class Pulse:
     """
+    Description: Class to model simple electromagnetic pulse propagation and interactions.
+        The pulse is modled by its electric field in the time domain.
+        
     Input:
-            - Center wavelength & time bandwidth
-            OR
-            - Center frequency and frequency bandwidth
-            OR
-            - Electric field in time
-            &
-            - Amplitude (Optional)
-            - T: length of the time vector
-            - dt: precision in the time vector
-    Pulse is caracterized by its electric field in the time domain.
+        ----------------------------------------------------------
+        - lambda0: float
+            Center wavelength of pulse [meters]
+        - tau_FWHM: float
+            FWHM pulse duration [seconds]    
+        OR
+        
+        - v0: float
+            Center frequency of pulse [Hertz]
+        - v_bandwidth: float
+            FWHM bandwidth in frequency domain [Hertz]
+        OR
+          
+        - E: ndarray
+            Electric field-like vector, defined in time domain [arb. u.]
+        - t: ndarray
+            Time vector [seconds]
+        -----------------------------------------------------------
+        &
+        
+        - A: float, optional
+            Maximum amplitude of E field, when E is not inputed [arb. u.]
+        - T: float, optional
+            Time window represented by time vector, when t is not inputed [seconds]
+        - dt: float, optional
+            Resolution of the time vector, when t is not inputed [seconds]
+    
+    Attributes:
+        - E: ndarray
+            Electric field-like vector, defined in time domain. Is either inputed or calculated.
+        - t: ndarray
+            Time vector. Is either inputed or defined as a linear grid of resolution dt and length T
+    
+    Methods:
+        - disperse: Returns a Pulse object on which effects of dispersion have been applied, either "manually" or through linear propagation modeling
+        
+        - getFWHM: Returns FWHM of either: pulse's intensity in time, power spectrum in frequency domain or power spectrum in wavelength domain
+        
+        - getInstFreq: Returns instantaneous angular frequency as a function of time
+        
+        - SFG: Returns a Pulse object calculated as a perfectly phase-matched SFG interaction between two Pulse objects.
+                Allows to estimate SFG spectrum relative shape.
+      
+        - delay: Returns a Pulse object which has been delayed in time by a fixed amount.
     """
     def __init__(self, lambda0 = None, tau_FWHM = None, v0 = None, v_bandwidth = None, A = 1, t = None, E = None, T = 10000e-15, dt = 0.1e-15):
         #%% Simulation parameters
@@ -433,14 +558,24 @@ class Pulse:
 
     def disperse(self, medium = None, L = None, dispVec = None, v0 = "Auto"):
         """
-        This method takes the the pulse and retrieves the temporal shape of the electric field
-        after propagation in a given medium, using Sellmeier's equations of this medium. If an
-        optionnal manual_GGD is entered, the code will not use "medium" and "L".
+        Description: This method takes the pulse and retrieves the temporal shape of the electric field
+            after propagation in a given medium, using Sellmeier's equations of this medium. If an
+            optionnal manual_GGD is entered, the code will not use "medium" and "L".
 
-        Input:
-            material : The optical medium through which the pulse propagates
-            L: The thickness of through which the pulse propagates
-            dispVec(optional): Custom amount of dispersion. Vector containing orders of dispersion from 2 to needed.
+        Inputs:
+            - material: str
+                The optical medium through which the pulse propagates
+            - L: float
+                The thickness of material through which the pulse propagates [meters]
+            - dispVec: array-like, optional
+                Custom amount of dispersion. Vector containing orders of dispersion from 2 up to whatever is needed. 
+                Example input is [GDD, TOD, ...], with GDD in fs^2, TOD in fs^3 and so forth.
+            - v0: float or "Auto"
+                Central frequency [Hertz]. If "Auto", will be calculated as average frequency of power spectrum.
+        
+        Outputs:
+            - new_Pulse: Pulse object
+                Dispersed pulse
         """
         # v is freqnecy vector, s is frequency-domain electric field vector
         v,s = ezfft(self.t,self.E, neg = True)
@@ -519,11 +654,17 @@ class Pulse:
 
     def getFWHM(self, domain = "wavelength"):
         """
-        Returns the FWHM of the pulse.
-        Can return the FWHM in either of these 3 domains, as selected by the user:
+        Description: Returns the FWHM of the pulse, defined in either of these 3 domains, as selected by the user:
             - wavelength (default)
             - frequency
             - time
+            
+        Inputs:
+            - domain: str, optional
+                Domain in which to evaluate FWHM
+                
+        Outputs:
+            - FWHM: float
         """
         v, s = ezfft(self.t, self.E)
         if domain is "time":
@@ -540,8 +681,13 @@ class Pulse:
 
     def getInstFreq(self):
         """
-        No input
-        Returns instantanious frequency
+        Description:  Returns instantaneous angular frequency as a function of time.
+        
+        No input whatsoever.
+        
+        Outputs:
+            - w_inst: ndarray
+                Instantanious angular frequency
         """
         # Temporal phase
         phi_t = np.unwrap(np.angle(self.E))
@@ -555,9 +701,22 @@ class Pulse:
 
     def SFG(self, Pulse2, SFGonly = True):
         """
-        Returns the spectral amplitude of the SFG from Pulse1 and Pulse2, along with a new Pulse object
-        defined by the total field resulting of the interaction. If SFGonly is False, the two SHGs will also
-        be returned along with the SFG in both the field and the spectral amplitude.
+        Description: Returns the spectral amplitude of the SFG from Pulse1 and Pulse2, along with a new Pulse object
+            defined by the total field resulting of the interaction. If SFGonly is False, the two SHGs will also
+            be returned along with the SFG in both the field and the spectral amplitude.
+            
+        Inputs:
+            - Pulse2: Pulse object.
+                Other Pulse2 involved in SFG process. Input self for SHG.
+            - SFGonly: bool
+                If false, self-SHG of each input pulse will also be computed and be added to SFG field.
+                
+        Outputs:
+            - SFG pulse: Pulse object
+            - f_nl: ndarray
+                Frequency vector for SFG spectrum [Hertz]
+            - A_nl: ndarray
+                Complex amplitude spectrum [arb. u.]
         """
         # Verification that the time vectors are the same
         if self.t.all() == Pulse2.t.all():
@@ -578,8 +737,15 @@ class Pulse:
 
     def delay(self, timeDelay):
         """
-        Delay the pulse in time domain by a value equal to timeDelay. Does not wrap it back once it reaches the
-        end of time vector t. A positive delay means the pulse's peak will shift towards negative time values.
+        Description: Delay the pulse in time domain by a value equal to timeDelay. Does not wrap it back once it reaches the
+            end of time vector t. A positive delay means the pulse's peak will shift towards negative time values.
+            
+        Inputs:
+            - timeDelay: Time duration with which to delay the pulse [seconds]
+            
+        Outputs:
+            - newPulse: Pulse object
+                Delayed pulse.
         """
         
         newEfield = np.interp(self.t, self.t - timeDelay, self.E)
