@@ -3,6 +3,12 @@
 Created on Mon Dec  3 16:18:05 2018
 
 @author: Etien & Patr & Benjm
+
+"""
+
+"""
+TEMPLATE FOR CREATION OF NEW FUNCTIONS, CLASSES, OR METHODS:
+    
 """
 
 #%% Imported modules
@@ -18,14 +24,30 @@ from scipy.optimize import curve_fit
 #%% Set constants and recurrant functions
 C = sc.c                          # Speed of light
 pi = sc.pi                        # Pi
-sqrt = lambda x: np.sqrt(x)       # Square root
-log = lambda x: np.log(x)         # Natural logarithm
-exp = lambda x: np.exp(x)         # Exponential
+from numpy import sqrt       # Square root
+from numpy import log         # Natural logarithm
+from numpy import exp         # Exponential
 
 #%% Methods and classes
 
 def ezfft(t, S, normalization = "ortho", neg = False):
-    """ Returns the Fourier transform of S and the frequency vector associated with it"""
+    """ 
+    Description: Returns the Fourier transform of S and the frequency vector associated with it
+    Inputs:
+        - t: array_like
+            Time vector [seconds]
+        - S: array_like
+            Signal vector [arb.u.]
+        - normalization: str, optionnal
+            Type of normalization for fft algorithm. For more info, see https://docs.scipy.org/doc/numpy/reference/routines.fft.html#module-numpy.fft
+        - neg: bool, optional
+            Choose whether or not to include negative frequencies components in output.
+    Outputs:
+        - f: ndarray
+            Frequency vector [Hz]
+        - y: complex ndarray
+            Complex amplitude vector [arb.u.]
+    """
     y = np.fft.fft(S,norm=normalization)
     y = np.fft.fftshift(y)
     f = np.fft.fftfreq(t.shape[-1], d = t[2]-t[1])
@@ -38,8 +60,22 @@ def ezfft(t, S, normalization = "ortho", neg = False):
 
 
 def ezifft(f, y, normalization = "ortho"):
-    '''Returns the inverse Fourier transform of y and the time vector associatedwith it
-    WARNING : the negative frequencies must be included in the y vector'''
+    """
+    Description: Returns the inverse Fourier transform of y and the time vector associated with it.
+    Inputs:
+        - f: array_like
+            Frequency vector [Hz]
+        - y: array_like
+            Complex amplitude vector [arb. u.]
+        - normalization: str, optionnal
+            Type of normalization for fft algorithm. For more info, see https://docs.scipy.org/doc/numpy/reference/routines.fft.html#module-numpy.fft
+    Outputs:
+        - t: array_like
+            Time vector [seconds]
+        - S: array_like
+            Signal vector [arb.u.] 
+    Other comments: Negative frequencies components should be included in f and y vectors. 
+    """
     N = len(f)
     tstep = 1/(N*(f[2]-f[1]))
     x = np.linspace(-(N*tstep/2),(N*tstep/2),N)
@@ -421,19 +457,19 @@ class Pulse:
                 phase += 1/math.factorial(i+2)*disp*(w-w0)**(i+2)*(1e-15)**(i+2)
             s = s*exp(1j*phase)
         else:
-            if medium == "BK7" or "bk7":
+            if medium.lower() == "bk7":
                 lambda_1 = 0.3e-6   # Cutoff wavelengths of the equation's validity
                 lambda_2 = 2.5e-6
                 n_sellmeier = lambda x: (1+1.03961212/(1-0.00600069867/x**2)+0.231792344/(1-0.0200179144/x**2)+1.01046945/(1-103.560653/x**2))**.5  #https://refractiveindex.info/?shelf=glass&book=BK7&page=SCHOTT
-            elif medium == "FS" or "Fused silica" or "fused silica":
+            elif ((medium.lower() == "fs") or (medium.lower() =="fused silica")):
                 lambda_1 = 0.21e-6
                 lambda_2 = 6.7e-6
                 n_sellmeier = lambda x: (1+0.6961663/(1-(0.0684043/x)**2)+0.4079426/(1-(0.1162414/x)**2)+0.8974794/(1-(9.896161/x)**2))**.5       #https://refractiveindex.info/?shelf=glass&book=fused_silica&page=Malitson
-            elif medium == "YAG" or "yag":
+            elif medium.lower() == "yag":
                 lambda_1 = 0.4e-6
                 lambda_2 = 5e-6
                 n_sellmeier = lambda x: (1+2.28200/(1-0.01185/x**2)+3.27644/(1-282.734/x**2))**.5   #https://refractiveindex.info/?shelf=main&book=Y3Al5O12&page=Zelmon
-            elif medium == "SF11" or "sf11":
+            elif medium.lower() == "sf11":
                 lambda_1 = 0.37e-6
                 lambda_2 = 2.5e-6
                 n_sellmeier = lambda x: (1+1.73759695/(1-0.013188707/x**2)+0.313747346/(1-0.0623068142/x**2)+1.89878101/(1-155.23629/x**2))**.5      #https://refractiveindex.info/tmp/data/glass/schott/N-SF11.html
