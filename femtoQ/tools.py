@@ -405,7 +405,7 @@ def ezdiff(x, y, n = 1, order = 2):
 
     return xtrunc, deriv
 
-def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
+def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True):
     
     """
     Description: With the measured parameters from a knife edge experiment, finds the beam size
@@ -424,12 +424,12 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
             Maximum signal (power). i.e. when the beam is not blocked. 
             If P_max is not entered, the function will use it as another
             fitting parameter and display the computed value.
+        - plot: bool, optionnal
+            Plots the measured and fitted Power curves if True
     Outputs:
         - params: array
             contains in that order: z0, w, P_max (if not specified as input)
     """
-    import femtoQ.plotting as fqp
-    fqp.set_default_values_presentation()
     
     if z is None or P is None:
         print('Position or power array is missing')
@@ -463,18 +463,21 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None):
     print('The beam diameter (1/e^2) is: ' + str(2*params[1]) + ' mm')
     
     # Plotting
-    plt.figure
-    plt.plot(z,P, 'o', label = 'Measured')
-    plt.plot( z_fit, P_fit, label = 'Fitted')
-    plt.xlabel('Razor edge position (mm)')
-    plt.ylabel('Average power (mW)')
-    if P_max:
-        plt.ylim([0,1.05*P_max])
-    else:
-        plt.ylim([0,1.05*params[2]])
-    plt.legend()
-
-    plt.show()
+    if plot is True:
+        import femtoQ.plotting as fqp
+        fqp.set_default_values_presentation()
+        plt.figure
+        plt.plot(z,P, 'o', label = 'Measured')
+        plt.plot( z_fit, P_fit, label = 'Fitted')
+        plt.xlabel('Razor edge position (mm)')
+        plt.ylabel('Average power (mW)')
+        if P_max:
+            plt.ylim([0,1.05*P_max])
+        else:
+            plt.ylim([0,1.05*params[2]])
+        plt.legend()
+    
+        plt.show()
     
     # Returns
     return params
