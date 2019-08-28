@@ -17,12 +17,7 @@ python setup.py sdist bdist_wheel
 echo Upload to PyPi
 twine upload dist/*
 
-
-echo Commit and push to git
-git commit -a -m "Updated pip version to match latest commit"
-git push
-
-
 echo Done!
+echo Don't forget to commit and push to git :)
 
 PAUSE
