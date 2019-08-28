@@ -449,14 +449,14 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
             return P0 + 0.5*P_max*(1-sp.special.erf(np.sqrt(2) * (z -z0)/w))
         # Fit an error function on the data
         params, param_covar = curve_fit(func, z, P)
-        z_fit = np.linspace(3, 11, 100)
+        z_fit = np.linspace(0.8*np.min(z), 1.2*np.max(z), 100)
         P_fit = func(z_fit, params[0], params[1])
     else:
         def func(z, z0, w, P_max):
             return P0 + 0.5*P_max*(1-sp.special.erf(np.sqrt(2) * (z -z0)/w))
         # Fit an error function on the data
         params, param_covar = curve_fit(func, z, P, bounds=(0, [np.max(z), np.max(z), np.max(P)]))
-        z_fit = np.linspace(3, 11, 100)
+        z_fit = np.linspace(0.8*np.min(z), 1.2*np.max(z), 100)
         P_fit = func(z_fit, params[0], params[1], params[2])
         print('The fitted max power is: ' + str(params[2]))
     
