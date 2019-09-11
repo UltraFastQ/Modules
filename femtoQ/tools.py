@@ -557,7 +557,7 @@ class Pulse:
         self.dt = dt
         if ((t is not None) & (E is not None)):
             self.t = t
-            self. E = E
+            self.E = E
 
         elif ((lambda0 is not None) & (tau_FWHM is not None)):
 
