@@ -482,6 +482,24 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
     # Returns
     return params
     
+def ezpad(x, y, left, right, values=(50,50)):
+    """
+    Input :
+    - x is the abscissa to pad, it is assumed to be a linear list
+    - y is the ordinate that will be padded
+    - left is the number of values to add to the left
+    - right is the number of values to add to the right
+    - values is (value to add to the left, value to add to the right)
+    Output :
+    Padded x and y lists
+    """
+    y = np.pad(y, (left, right), 'constant', constant_values=values) # Use numpy pad function to pad y array
+    step = x[1] - x[0]
+    # Manually padding the x vector assuming it is linear
+    x = np.append(np.linspace(x[0]-left*step, x[0]-step, left), x)
+    x = np.append(x, np.linspace(x[-1]+step, x[-1]+right*step, right))
+    return x,y
+
 class Pulse:
     """
     Description: Class to model simple electromagnetic pulse propagation and interactions.
