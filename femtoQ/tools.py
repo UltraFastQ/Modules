@@ -629,6 +629,10 @@ class Pulse:
                 lambda_1 = 0.37e-6
                 lambda_2 = 2.5e-6
                 n_sellmeier = lambda x: (1+1.73759695/(1-0.013188707/x**2)+0.313747346/(1-0.0623068142/x**2)+1.89878101/(1-155.23629/x**2))**.5      #https://refractiveindex.info/tmp/data/glass/schott/N-SF11.html
+            elif medium.lower() == "sf10":
+                lambda_1 = 0.38e-6
+                lambda_2 = 2.5e-6
+                n_sellmeier = lambda x: (1+1.62153902/(1-0.0122241457/x**2)+0.256287842/(1-0.0595736775/x**2)+1.64447552/(1-147.468793/x**2))**.5
             else:
                 print("The entered medium does not exist or its Sellmeier's equations are not contained in this method")
                 return self
