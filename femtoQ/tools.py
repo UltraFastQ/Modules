@@ -466,7 +466,7 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
     if plot is True:
         import femtoQ.plotting as fqp
         fqp.set_default_values_presentation()
-        plt.figure
+        plt.figure()
         plt.plot(z,P, 'o', label = 'Measured')
         plt.plot( z_fit, P_fit, label = 'Fitted')
         plt.xlabel('Razor edge position (mm)')
