@@ -482,6 +482,24 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
     # Returns
     return params
     
+def ezpad(x, y, left, right, values=(50,50)):
+    """
+    Input :
+    - x is the abscissa to pad, it is assumed to be a linear list
+    - y is the ordinate that will be padded
+    - left is the number of values to add to the left
+    - right is the number of values to add to the right
+    - values is (value to add to the left, value to add to the right)
+    Output :
+    Padded x and y lists
+    """
+    y = np.pad(y, (left, right), 'constant', constant_values=values) # Use numpy pad function to pad y array
+    step = x[1] - x[0]
+    # Manually padding the x vector assuming it is linear
+    x = np.append(np.linspace(x[0]-left*step, x[0]-step, left), x)
+    x = np.append(x, np.linspace(x[-1]+step, x[-1]+right*step, right))
+    return x,y
+
 class Pulse:
     """
     Description: Class to model simple electromagnetic pulse propagation and interactions.
@@ -539,7 +557,7 @@ class Pulse:
         self.dt = dt
         if ((t is not None) & (E is not None)):
             self.t = t
-            self. E = E
+            self.E = E
 
         elif ((lambda0 is not None) & (tau_FWHM is not None)):
 
@@ -611,6 +629,10 @@ class Pulse:
                 lambda_1 = 0.37e-6
                 lambda_2 = 2.5e-6
                 n_sellmeier = lambda x: (1+1.73759695/(1-0.013188707/x**2)+0.313747346/(1-0.0623068142/x**2)+1.89878101/(1-155.23629/x**2))**.5      #https://refractiveindex.info/tmp/data/glass/schott/N-SF11.html
+            elif medium.lower() == "sf10":
+                lambda_1 = 0.38e-6
+                lambda_2 = 2.5e-6
+                n_sellmeier = lambda x: (1+1.62153902/(1-0.0122241457/x**2)+0.256287842/(1-0.0595736775/x**2)+1.64447552/(1-147.468793/x**2))**.5
             else:
                 print("The entered medium does not exist or its Sellmeier's equations are not contained in this method")
                 return self
