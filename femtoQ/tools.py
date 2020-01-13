@@ -329,7 +329,7 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
         width /= 2
         
     if pos is True:
-        xvalues = np.array(tmp2[-1], tmp2[0])
+        xvalues = np.array([tmp2[-1], tmp2[0]])
         return width, xvalues
     else:
         return width
