@@ -266,7 +266,7 @@ def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, 
     return outlist
 
 
-def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
+def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos = False):
     """
     Description: Function that finds the width of an input signal or pulse. By default, the FWHM will be returned, unless height 
                  and/or halfwidth options are changed. 
@@ -282,6 +282,13 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
             Selects height for which width is calculated
         - interp points: int, optionnal
             Function will be interpolated to this number of points if the input has less points than this number
+        - pos: bool, optional
+            if true return the position array 
+        
+    Outputs:
+        - width (defined in the same units (time, frequency, wavelength, etc.))
+        - xvalues: array, optional
+            The two positions in x used for the width calculation
     """
     # Ensure x is stricktly ascending
     IIsort = np.argsort(x)
@@ -320,8 +327,12 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
     # Divide by two, if desired
     if halfwidth is True:
         width /= 2
-
-    return width
+        
+    if pos is True:
+        xvalues = np.array(tmp2[-1], tmp2[0])
+        return width, xvalues
+    else:
+        return width
 
 
 
