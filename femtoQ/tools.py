@@ -123,13 +123,16 @@ def ezsmooth(x, window_len=11, window='flat'):
 
      if window_len<3:
          return x
+     
+     if (window_len % 2) == 0:
+        window_len+=1
 
 
      if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
          raise ValueError("Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
 
-     s=np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
+     s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
 
      if window == 'flat': #moving average
          w=np.ones(window_len,'d')
@@ -137,7 +140,7 @@ def ezsmooth(x, window_len=11, window='flat'):
          w=eval('np.'+window+'(window_len)')
 
      y=np.convolve(w/w.sum(),s,mode='valid')
-     return  y[round(window_len/2-1):-round(window_len/2)]
+     return  y[int(np.ceil(window_len/2-1)):-int(np.ceil(window_len/2-1))]
 
 
 def ezcorr(x, y1, y2, unbiased=False, Norm=False, Mean = False):
