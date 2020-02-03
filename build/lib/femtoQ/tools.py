@@ -123,13 +123,16 @@ def ezsmooth(x, window_len=11, window='flat'):
 
      if window_len<3:
          return x
+     
+     if (window_len % 2) == 0:
+        window_len+=1
 
 
      if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
          raise ValueError("Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
 
-     s=np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
+     s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
 
      if window == 'flat': #moving average
          w=np.ones(window_len,'d')
@@ -137,7 +140,7 @@ def ezsmooth(x, window_len=11, window='flat'):
          w=eval('np.'+window+'(window_len)')
 
      y=np.convolve(w/w.sum(),s,mode='valid')
-     return  y[round(window_len/2-1):-round(window_len/2)]
+     return  y[int(np.ceil(window_len/2-1)):-int(np.ceil(window_len/2-1))]
 
 
 def ezcorr(x, y1, y2, unbiased=False, Norm=False, Mean = False):
@@ -266,7 +269,7 @@ def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, 
     return outlist
 
 
-def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
+def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos = False):
     """
     Description: Function that finds the width of an input signal or pulse. By default, the FWHM will be returned, unless height 
                  and/or halfwidth options are changed. 
@@ -282,6 +285,13 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
             Selects height for which width is calculated
         - interp points: int, optionnal
             Function will be interpolated to this number of points if the input has less points than this number
+        - pos: bool, optional
+            if true return the position array 
+        
+    Outputs:
+        - width (defined in the same units (time, frequency, wavelength, etc.))
+        - xvalues: array, optional
+            The two positions in x used for the width calculation
     """
     # Ensure x is stricktly ascending
     IIsort = np.argsort(x)
@@ -320,8 +330,12 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6):
     # Divide by two, if desired
     if halfwidth is True:
         width /= 2
-
-    return width
+        
+    if pos is True:
+        xvalues = np.array([tmp2[-1], tmp2[0]])
+        return width, xvalues
+    else:
+        return width
 
 
 
@@ -466,7 +480,7 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
     if plot is True:
         import femtoQ.plotting as fqp
         fqp.set_default_values_presentation()
-        plt.figure
+        plt.figure()
         plt.plot(z,P, 'o', label = 'Measured')
         plt.plot( z_fit, P_fit, label = 'Fitted')
         plt.xlabel('Razor edge position (mm)')
@@ -632,7 +646,11 @@ class Pulse:
             elif medium.lower() == "sf10":
                 lambda_1 = 0.38e-6
                 lambda_2 = 2.5e-6
-                n_sellmeier = lambda x: (1+1.62153902/(1-0.0122241457/x**2)+0.256287842/(1-0.0595736775/x**2)+1.64447552/(1-147.468793/x**2))**.5
+                n_sellmeier = lambda x: (1+1.62153902/(1-0.0122241457/x**2)+0.256287842/(1-0.0595736775/x**2)+1.64447552/(1-147.468793/x**2))**.5    #https://refractiveindex.info/?shelf=glass&book=SF10&page=SCHOTT
+            elif medium.lower() == "znse":
+                lambda_1 = 0.54e-6
+                lambda_2 = 18.2e-6
+                n_sellmeier = lambda x: (1+4.45813734/(1-(0.200859853/x)**2)+0.467216334/(1-(0.391371166/x)**2)+2.89566290/(1-(47.1362108/x)**2))**.5    #https://refractiveindex.info/?shelf=main&book=ZnSe&page=Connolly
             else:
                 print("The entered medium does not exist or its Sellmeier's equations are not contained in this method")
                 return self
