@@ -285,13 +285,9 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
             Selects height for which width is calculated
         - interp points: int, optionnal
             Function will be interpolated to this number of points if the input has less points than this number
-        - pos: bool, optional
-            if true return the position array 
         
     Outputs:
         - width (defined in the same units (time, frequency, wavelength, etc.))
-        - xvalues: array, optional
-            The two positions in x used for the width calculation
     """
     # Ensure x is stricktly ascending
     IIsort = np.argsort(x)
@@ -331,10 +327,6 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
     if halfwidth is True:
         width /= 2
         
-    if pos is True:
-        xvalues = np.array([tmp2[-1], tmp2[0]])
-        return width, xvalues
-    else:
         return width
 
 
@@ -589,7 +581,7 @@ class Pulse:
             tau = tauFWHM / sqrt(2*log(2)) # Gaussian pulse half width @ e^-2
             w0 = 2*pi*v0                    # Pulse's carrier angular frequency
             self.t = np.linspace(-T/2,T/2, round(T/self.dt) )
-            self.E = A* exp(1j * w0 * (t)) * np.exp( - (t)**2 / (tau)**2)    # Electric field of the pulse in the time domain
+            self.E = A* exp(1j * w0 * (self.t)) * np.exp( - (self.t)**2 / (tau)**2)    # Electric field of the pulse in the time domain
 
     def disperse(self, medium = None, L = None, dispVec = None, v0 = "Auto"):
         """
@@ -765,11 +757,11 @@ class Pulse:
         if self.t.all() == Pulse2.t.all():
             # Consider SFG without SHGs
             if SFGonly is True:
-                Atmp = self.E * Pulse2.E
+                Atmp = self.E * Pulse2.E*1j
             # Consider both SHGs and the SFG
             elif SFGonly is False:
                 E_tot =  self.E + Pulse2.E
-                Atmp = E_tot * E_tot
+                Atmp = E_tot * E_tot*1j
 
             f_nl, A_nl = ezfft(self.t, Atmp)
             return Pulse(t = self.t, E = Atmp), f_nl, A_nl
