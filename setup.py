@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="femtoMod",
-    version="1.3.3",
+    version="1.4.0",
     author="Patrick, Benjamin, Etienne",
     description="femtoQ Modules",
     long_description=long_description,
