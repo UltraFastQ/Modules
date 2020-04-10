@@ -702,11 +702,11 @@ class Pulse:
             - FWHM: float
         """
         v, s = ezfft(self.t, self.E)
-        if domain is "time":
+        if domain == "time":
             return ezfindwidth(self.t, np.abs(self.E)**2)
-        elif domain is "frequency":
+        elif domain == "frequency":
             return ezfindwidth(v, np.abs(s)**2)
-        elif domain is "wavelength":
+        elif domain == "wavelength":
             l = C/v
             return ezfindwidth(l, np.abs(s)**2)
         else:
