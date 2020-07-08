@@ -113,7 +113,7 @@ def find_shear(wavelengths, upconvPowerSpectrum, movingMirrorData, movingMirror_
     # need to check if another strategy would work better
     Df = frequencies[-1] - frequencies[0]
     df = np.max( np.diff(frequencies) ) / 16
-    N = round(Df / df)
+    N = int(round(Df / df))
     linFreqs = np.linspace(frequencies[-1]-(N-1)*df, frequencies[-1], N )
     upconvPowerSpectrum = np.interp(linFreqs, frequencies, upconvPowerSpectrum)
     
@@ -275,7 +275,7 @@ def make1Dfft(wavelengths,stagePosition,trace,zeropadding = True, windowing = Tr
                
 def cut_fft(amplitude, phase, wavelengths,debugGraphs):
     
-    cut = 0.000
+    cut = 0.01
     extend = 0
     
     Icut = amplitude >= cut*np.max(amplitude)
@@ -468,9 +468,9 @@ def calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, a
             
             if minTimeResolution < 1/(2*nuMax):
                 newNuMax = 1 / (2* minTimeResolution)
-                nu = np.linspace(-newNuMax, newNuMax, np.floor(2*newNuMax/dNu)+1)
+                nu = np.linspace(-newNuMax, newNuMax, int(np.floor(2*newNuMax/dNu))+1)
             else:
-                nu = np.linspace(-nuMax, nuMax, np.floor(2*nuMax/dNu)+1)
+                nu = np.linspace(-nuMax, nuMax, int(np.floor(2*nuMax/dNu))+1)
             
             interpEnvelope = np.zeros_like(nu)
             interpPhase = np.zeros_like(nu)
@@ -515,9 +515,9 @@ def calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, a
         
         if minTimeResolution < 1/(2*nuMax):
                 newNuMax = 1 / (2* minTimeResolution)
-                nu = np.linspace(-newNuMax, newNuMax, np.floor(2*newNuMax/dNu)+1)
+                nu = np.linspace(-newNuMax, newNuMax, int(np.floor(2*newNuMax/dNu))+1)
         else:
-                nu = np.linspace(-nuMax, nuMax, np.floor(2*nuMax/dNu)+1)
+                nu = np.linspace(-nuMax, nuMax, int(np.floor(2*nuMax/dNu))+1)
             
         interpEnvelope = np.zeros_like(nu)
         interpPhase = np.zeros_like(nu)
