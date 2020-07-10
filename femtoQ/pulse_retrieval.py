@@ -4,8 +4,8 @@
 import femtoQ.tools as fq
 import numpy as np
 import matplotlib.pyplot as plt
-from femtoQ_addon.pr_backend import tdsilib as tdsi
-from femtoQ_addon.pr_backend import froglib as frog
+from femtoQ.pr_backend import tdsilib as tdsi
+from femtoQ.pr_backend import froglib as frog
 from scipy.constants import c as C
 from scipy.interpolate import interp1d as interp
 from scipy.integrate import simps as simpson

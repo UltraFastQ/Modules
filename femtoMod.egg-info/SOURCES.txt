@@ -11,6 +11,9 @@ femtoQ/plotting_example.py
 femtoQ/pulse_retrieval.py
 femtoQ/simulate_pulse_retrieval.py
 femtoQ/tools.py
+femtoQ/pr_backend/__init__.py
+femtoQ/pr_backend/froglib.py
+femtoQ/pr_backend/tdsilib.py
 pypret/__init__.py
 pypret/autocorrelation.py
 pypret/fourier.py
