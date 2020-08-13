@@ -327,7 +327,7 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
     if halfwidth is True:
         width /= 2
         
-        return width
+    return width
 
 
 
