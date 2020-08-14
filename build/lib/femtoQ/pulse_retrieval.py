@@ -4,8 +4,8 @@
 import femtoQ.tools as fq
 import numpy as np
 import matplotlib.pyplot as plt
-from femtoQ.pr_backend import tdsilib as tdsi
-from femtoQ.pr_backend import froglib as frog
+from femtoQ.pr_backend import tdsilib as library_2dsi
+from femtoQ.pr_backend import froglib as library_frog
 from scipy.constants import c as C
 from scipy.interpolate import interp1d as interp
 from scipy.integrate import simps as simpson
@@ -59,7 +59,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
         minWavelength = wavelengthCutoffs[0]
         maxWavelength = wavelengthCutoffs[1]
         
-        fixedMirrorData, movingMirrorData, wavelengths, tdsiTrace = tdsi.cut_spectrum(minWavelength, maxWavelength, fixedMirrorData, movingMirrorData, wavelengths, tdsiTrace)
+        fixedMirrorData, movingMirrorData, wavelengths, tdsiTrace = library_2dsi.cut_spectrum(minWavelength, maxWavelength, fixedMirrorData, movingMirrorData, wavelengths, tdsiTrace)
     
     
     #%% Smooth spectrum, if desired
@@ -71,7 +71,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     #%% Substract noise floor from data. Taken as max value of either the first or
     #   the last datapoint of the spectrum. Any negative value is afterward set to 0.
-    fixedMirrorData, movingMirrorData = tdsi.substractNoiseFloor(fixedMirrorData, movingMirrorData)
+    fixedMirrorData, movingMirrorData = library_2dsi.substractNoiseFloor(fixedMirrorData, movingMirrorData)
     
     """ Add trace postprocessing here. Mostly consists of interpolating trace to a linear
         grid along stage displacement axis. Will be added once the 2dsi control software
@@ -121,7 +121,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     if manualShear is not None:
     
         # Make a map of shear vs stage position
-        shearMap = tdsi.make_shear_map(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,debug)
+        shearMap = library_2dsi.make_shear_map(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,debug)
         
         # Make a linear fit
         p = np.polyfit(shearMap, movingMirrorZ,1)
@@ -147,27 +147,27 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     
     """ Find mean shear of data """ 
-    shearFrequency = tdsi.find_shear(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,tdsiTraceZ,debug)
+    shearFrequency = library_2dsi.find_shear(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,tdsiTraceZ,debug)
     
     """ Perform 1D Fourier transform of trace along stage position dimension """ 
-    FFTspatialFreq, FFTamplitude, FFTphase = tdsi.make1Dfft(wavelengths,tdsiTraceZ,tdsiTrace,zeropadding = zeroPadTrace, windowing = windowTrace, debugGraphs=debug)
+    FFTspatialFreq, FFTamplitude, FFTphase = library_2dsi.make1Dfft(wavelengths,tdsiTraceZ,tdsiTrace,zeropadding = zeroPadTrace, windowing = windowTrace, debugGraphs=debug)
     
     """ Cut FFT data to region with minimum amplitude """ 
-    FFTamplitude, FFTphase, FFTwavelengths = tdsi.cut_fft(FFTamplitude, FFTphase, wavelengths,debug)
+    FFTamplitude, FFTphase, FFTwavelengths = library_2dsi.cut_fft(FFTamplitude, FFTphase, wavelengths,debug)
     
     """ Calculate spectral phase from FFT. Currently only using concatenation algorithm.
         Also outputs GDD and TOD (this calculation wil be moved to a new function 
         once other algorithms will be implemented """ 
-    concW, concPhase,concGD, concGDD, concTOD, midpointW, midpointPhase,midpointGD, midpointGDD, midpointTOD = tdsi.calc_spectral_phase(shearFrequency, upconvWavelength,FFTamplitude, FFTphase, FFTwavelengths,polyfit = fitPolynomialToPhase,debugGraphs = debug)
+    concW, concPhase,concGD, concGDD, concTOD, midpointW, midpointPhase,midpointGD, midpointGDD, midpointTOD = library_2dsi.calc_spectral_phase(shearFrequency, upconvWavelength,FFTamplitude, FFTphase, FFTwavelengths,polyfit = fitPolynomialToPhase,debugGraphs = debug)
     
     """ Calculate temporal enveloppe of pulse from upconverted power spectrum and
         spectral phase calculated above. Function directly outputs the square of 
         the enveloppe, to obtain intensity-like vertical units """
-    tConc, pulseConc,Econc = tdsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, concW, concPhase, True, minTimeResolution)
-    tMidpoint, pulseMidpoint, Emidpoint = tdsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, midpointW, midpointPhase, True,minTimeResolution)
+    tConc, pulseConc,Econc = library_2dsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, concW, concPhase, True, minTimeResolution)
+    tMidpoint, pulseMidpoint, Emidpoint = library_2dsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, midpointW, midpointPhase, True,minTimeResolution)
     
     """ Calculate temporal enveloppe of Fourier-limited pulse """
-    tLim, pulseLim, Elim = tdsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, concW, np.zeros_like(concW), False,minTimeResolution)
+    tLim, pulseLim, Elim = library_2dsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, concW, np.zeros_like(concW), False,minTimeResolution)
     
     """ Realign pulse's peak intensity to t = 0 fs """
     tpeak = tConc[ np.argmax(pulseConc)]
@@ -196,14 +196,16 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     ax.legend()
     ax.set_xlim([-150, 150])
     
-    fig = plt.figure()
-    ax = fig.gca()
-    ax.plot(tLim*1e15, pulseLim/np.max(pulseLim), 'k', label = 'Fourier limited')
-    ax.plot(tConc*1e15, pulseConc/np.max(pulseConc), '--r', label = 'Reconstructed')
-    ax.set_xlabel('Time [fs]')
-    ax.set_ylabel('Normalised intensity')
-    ax.legend()
-    ax.set_xlim([-150, 150])
+# =============================================================================
+#     fig = plt.figure()
+#     ax = fig.gca()
+#     ax.plot(tLim*1e15, pulseLim/np.max(pulseLim), 'k', label = 'Fourier limited')
+#     ax.plot(tConc*1e15, pulseConc/np.max(pulseConc), '--r', label = 'Reconstructed')
+#     ax.set_xlabel('Time [fs]')
+#     ax.set_ylabel('Normalised intensity')
+#     ax.legend()
+#     ax.set_xlim([-150, 150])
+# =============================================================================
     
     
     fig = plt.figure()
@@ -275,7 +277,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     print('Shear frequency:' + str(round(shearFrequency/1e12 * 100)/100) + ' THz')
     
     if simulateFrogTrace:
-        tdsi.simFrogTrace(tConc,Econc,minWavelength,maxWavelength)
+        library_2dsi.simFrogTrace(tConc,Econc,minWavelength,maxWavelength)
     
     plt.show()
     
@@ -285,7 +287,12 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
 def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None):
     
     
-    delays, wavelengths, trace = frog.unpack_data(filename,wavelengthLimits)
+    delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits)
+    
+    marginal_t = simpson(trace,wavelengths,axis = 1)
+    t_0 = t[np.argmax(marginal_t)]
+    delays -= t_0
+    
     
     if method.lower() == 'pcgpa':
         symmetrizeGrid = True
@@ -377,9 +384,9 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     if initialGuess.lower() == 'gaussian':
         if tau is None:
             autocorr =  simpson(trace,wavelengths,axis = 1)
-            tau = frog.get_FWHM(delays,autocorr)/np.sqrt(2) /np.sqrt(2*np.log(2))
+            tau = library_frog.get_FWHM(delays,autocorr)/np.sqrt(2) /np.sqrt(2*np.log(2))
             
-            dw = frog.get_FWHM(2*np.pi*C/wavelengths[-1::-1],marginal_w[-1::-1])/np.sqrt(2) /np.sqrt(2*np.log(2))
+            dw = library_frog.get_FWHM(2*np.pi*C/wavelengths[-1::-1],marginal_w[-1::-1])/np.sqrt(2) /np.sqrt(2*np.log(2))
             tau_0 = 2 / (dw)
             
             if tau > tau_0:
@@ -394,7 +401,7 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         initialGuess = np.complex128(np.exp(- (w_fund-w_0)**2 / dw**2)) * np.exp(1j*GDD*(w_fund-w_0)**2)
         
     else:
-        initialGuess = frog.RANA(delays,w_shg,trace_w,w_fund)
+        initialGuess = library_frog.RANA(delays,w_shg,trace_w,w_fund)
     
     
     # Instantiate retriver
@@ -406,11 +413,11 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     results = ret.result()
     
     # Export retrieved pulse & trace
-    pulseRetrieved = results.pulse_retrieved
+    pulseRetrieved = fq.ezsmooth(results.pulse_retrieved, window = 'hanning')
     traceRetrieved = results.trace_retrieved
     pulseFrequencies = w_fund/(2*np.pi)
     traceFrequencies = w_shg/(2*np.pi)
     
-    frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
+    library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
 
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths

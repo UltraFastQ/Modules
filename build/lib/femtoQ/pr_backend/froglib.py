@@ -9,7 +9,7 @@ import femtoQ.tools as fq
 
 def get_FWHM(t,I_t):
     
-    tmp = np.linspace(t[0],t[-1],1e6)
+    tmp = np.linspace(t[0],t[-1],1000000)
     
     I_tmp = interp(t,I_t,'quadratic')
     I_tmp = I_tmp(tmp)
@@ -60,6 +60,8 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     E = interp(t-t0,E,'quadratic',bounds_error=False,fill_value=0)
     E = E(t)
     
+    print('FWHM duration: ' + str( round(get_FWHM(t, np.abs(E)**2)*1e15,1) ) + ' fs')
+    print('FWHM duration: ' + str( round(get_FWHM(t, np.abs(E_cmp)**2)*1e15,1) ) + ' fs')
     
     plt.figure()
     plt.plot(t*1e15,np.abs(E)**2 / np.max(np.abs(E)**2),'b',label = 'Retrieved')
