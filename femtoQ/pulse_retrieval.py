@@ -11,9 +11,25 @@ from scipy.interpolate import interp1d as interp
 from scipy.integrate import simps as simpson
 import pypret
 
+def freq2time(frequency, amplitude_spectrum):
+    # Interpolate over new frequency grid, including negative w components
+    freq_max = frequency[-1]
+    freq_min = -freq_max
+    N = len(amplitude_spectrum)
+    dv = freq_max/N
+    
+    new_freq_grid = np.hstack((np.array([0]),np.linspace(dv,freq_max,N),np.linspace(freq_min,-dv,N)))
+    
+    spectrum_interpolated = interp(frequency,amplitude_spectrum,'quadratic',bounds_error=False,fill_value=0)(new_freq_grid)
+     
+
+    amplitude_time = np.fft.fftshift(np.fft.ifft(spectrum_interpolated))
+    t = np.fft.fftshift(np.fft.fftfreq(2*N+1,dv))
+
+    return t, amplitude_time
 
 
-def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoothSpectrum = False, zeroPadTrace = True, windowTrace = True, minTimeResolution = 1e-15, folder = ''):
+def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoothSpectrum = False, zeroPadTrace = True, windowTrace = True, minTimeResolution = 1e-15, folder = '', spectrum = None):
 
     #%% Analysis parameters
     debug = False                # Setting True will output many more figures for debugging
@@ -49,7 +65,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
         inputPulse = data['inputPulse']
     
     data.close()
-        
+    
     
     #%% Cut spectrum to relevant spectral region
     """ Min and max wavelengths of spectral windowing. Any data outisde of this range
@@ -102,9 +118,27 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     wavelengths = wavelengths * 1e-9
     upconvPowerSpectrum = fixedMirrorData
     
+    
+    if spectrum is not None:
+        data2 = np.load(folder+spectrum)
+        fundPowerSpectrum = data2['spectrum']
+        fundWavelengths = data2['wavelengths']*1e-9
+        data2.close()
+        if upconvWavelength == 'auto':
+            upconvWavelength = library_2dsi.find_upconversion(wavelengths, upconvPowerSpectrum, fundWavelengths, fundPowerSpectrum)
+            print('Upconversion wavelength: ' + str(round(upconvWavelength*1e9)) + ' nm')
+        plt.figure()
+        plt.plot(fundWavelengths*1e9,fundPowerSpectrum/fundPowerSpectrum.max(), label = 'Fundamental spectrum')
+        plt.plot(1/(1/wavelengths-1/upconvWavelength)*1e9, upconvPowerSpectrum/upconvPowerSpectrum.max(),'--r', label = 'Un-upconverted spectrum')
+        plt.xlabel('Wavelengths [nm]')
+        plt.ylabel('Normalized power density')
+        plt.legend()
+        
+        
     if upconvWavelength == 'auto':
     
         upconvWavelength = wavelengths[np.argmax(upconvPowerSpectrum)]*2
+        print('Upconversion wavelength: ' + str(round(upconvWavelength*1e9)) + ' nm')
         
         
     #%% Smooth spectrum, if desired
@@ -154,6 +188,13 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     """ Cut FFT data to region with minimum amplitude """ 
     FFTamplitude, FFTphase, FFTwavelengths = library_2dsi.cut_fft(FFTamplitude, FFTphase, wavelengths,debug)
+    
+    if spectrum is not None:
+        
+        FFTwavelengths = 1 / ( 1/FFTwavelengths - 1/upconvWavelength )
+        wavelengths = fundWavelengths
+        upconvPowerSpectrum = fundPowerSpectrum
+        upconvWavelength = np.infty
     
     """ Calculate spectral phase from FFT. Currently only using concatenation algorithm.
         Also outputs GDD and TOD (this calculation wil be moved to a new function 
@@ -221,7 +262,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     concGDD =  np.flip( concGDD.flatten()[IIGDD]*1e30 )
     concTOD =  np.flip( concTOD.flatten()[IITOD]*1e45 )
     
-    IIplot = upconvPowerSpectrum > np.max(upconvPowerSpectrum)/100
+    IIplot = upconvPowerSpectrum > np.max(upconvPowerSpectrum)/20
     wav1 = (1 / (1/wavelengths - 1/upconvWavelength)*1e9)[IIplot][0]
     wav2 = (1 / (1/wavelengths - 1/upconvWavelength)*1e9)[IIplot][-1]
     IIGDD = ((lambdaGDD>=wav1) & (lambdaGDD<=wav2))
@@ -284,13 +325,13 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     return
     
     
-def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None):
+def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
     
     
     delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits)
     
     marginal_t = simpson(trace,wavelengths,axis = 1)
-    t_0 = t[np.argmax(marginal_t)]
+    t_0 = delays[np.argmax(marginal_t)]
     delays -= t_0
     
     
@@ -331,14 +372,54 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     if gridSize is not None:
         ft = pypret.FourierTransform(gridSize[1], dt = dt)
     else:
-        ft = pypret.FourierTransform(len(wavelengths), dt = dt)
+        ft = pypret.FourierTransform(len(delays), dt = dt)
     
     # Integrate over delay axis
     marginal_w = simpson(trace,delays,axis = 0)
     
+        
+    
     lambda_0 = C/(simpson(C/wavelengths[-1::-1]*marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)/simpson(marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)) * 2
     
     
+    if marginalCorrection is not None:
+        data = np.load(marginalCorrection)
+        corrWavelengths = data['wavelengths']*1e-9
+        corrSpectrum = data['spectrum']
+        
+        
+        corrW = np.linspace(2*np.pi*C/corrWavelengths[-1],2*np.pi*C/corrWavelengths[0],len(corrWavelengths))
+        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1] )(corrW)
+        W_0 = simpson(corrW*corrSpectrum,corrW)/simpson(corrSpectrum,corrW)
+        
+        
+        delta_w = corrW[1]-corrW[0]
+        autoConv = np.correlate(corrSpectrum,corrSpectrum,"full")*delta_w
+        absc_conv = delta_w*np.linspace(-len(autoConv)/2,len(autoConv)/2,len(autoConv))
+        
+        plt.figure()
+        plt.plot((-absc_conv[-1::-1]),autoConv[-1::-1])
+        
+        autoConv = interp(absc_conv, autoConv)(2*np.pi*C*(1/wavelengths-2/lambda_0))
+        
+        
+        marginalCorr = ( autoConv/autoConv.max() ) / ( marginal_w / marginal_w.max() )
+        
+        for ii, delay in enumerate(delays):
+            trace[ii,:]*=marginalCorr
+        
+        plt.figure()
+        plt.plot(wavelengths*1e9,autoConv/autoConv.max(),label = 'From spectrum')
+        plt.plot(wavelengths*1e9,marginal_w / marginal_w.max(), label = 'From FROG trace')
+        plt.xlabel('Wavelengths [nm]')
+        plt.ylabel('Frequency margianal')
+        plt.legend()
+        
+        plt.figure()
+        plt.plot(wavelengths*1e9,marginalCorr)
+        plt.xlabel('Wavelengths [nm]')
+        plt.ylabel('Marginal correction factor')
+        
     
     # Instantiate a pulse object w/ appropriate central wavelength
     # (other parameters don't matter here)
@@ -368,11 +449,14 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     
     # Plot interpolated trace (to check interpolation errors)
     plt.figure()
-    plt.pcolor((2*np.pi*C/w_shg)*1e9,delays*1e15,trace_w)
-    plt.title('Input trace (interpolated)')
-    plt.ylabel('Delay [fs]')
-    plt.xlabel('Wavelengths [nm]')
-    plt.xlim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
+    plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg)*1e9,trace_w.transpose())
+    if marginalCorrection is None:
+        plt.title('Input trace (interpolated)')
+    else:
+        plt.title('Input trace (corrected + interpolated)')
+    plt.xlabel('Delay [fs]')
+    plt.ylabel('Wavelengths [nm]')
+    plt.ylim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
     plt.colorbar()
 
     # Reformat trace for retriever
