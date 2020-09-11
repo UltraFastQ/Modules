@@ -204,8 +204,94 @@ def find_shear(wavelengths, upconvPowerSpectrum, movingMirrorData, movingMirror_
     return shear
 
 
+def find_upconversion(wavelengths, upconvPowerSpectrum, fundWavelengths, fundPowerSpectrum):
+    """ Calculate shear frequency as a function of stage position,
+    and take its value at the middle position as constant approximation """
+    
+    # Normalize spectra to max of one
+    upconvPowerSpectrum = upconvPowerSpectrum / np.max(upconvPowerSpectrum)
+    
+    fundPowerSpectrum = fundPowerSpectrum/fundPowerSpectrum.max()
 
 
+    # Convert wavelengths to frequencies
+    frequencies = C / wavelengths
+    fundFrequencies = C/ fundWavelengths
+    
+    frequencies = np.flip(frequencies) # Flipping from low to high frequencies
+    fundFrequencies = np.flip(fundFrequencies)
+    upconvPowerSpectrum = np.flip(upconvPowerSpectrum)
+    fundPowerSpectrum = np.flip(fundPowerSpectrum)
+    
+    # Interpolate to a linear spacing of frequencies
+    # Choice of datapoint position strongly affect results, here I am copying Matlab
+    # need to check if another strategy would work better
+    Df = np.min( [ np.min(np.diff(frequencies)),  np.min(np.diff(fundFrequencies))  ]  )
+    maxFreq = frequencies.max()
+    minFreq = fundFrequencies.min()
+    
+    N = int(round((maxFreq -minFreq) / Df))
+    linFreqs = np.linspace(maxFreq, minFreq, N )
+    
+    upconvPowerSpectrum = np.interp(linFreqs, frequencies, upconvPowerSpectrum)
+    fundPowerSpectrum = np.interp(linFreqs, fundFrequencies, fundPowerSpectrum)
+    
+    frequencies = linFreqs
+    
+    
+    
+    #crossCorr = np.zeros( (movingMirrorData.shape[0], movingMirrorData.shape[1]))
+    crossCorr = np.zeros( linFreqs.shape[0]*2-1 )
+
+    lags = np.zeros_like(crossCorr)
+    
+    crossCorr =  np.correlate(fundPowerSpectrum, upconvPowerSpectrum,'full')
+    maxId = np.argmax(crossCorr)
+    peakFreq = -(N - (maxId+1))*Df
+    lags = -(N - np.linspace(1,2*N-1,2*N-1) ) *Df
+    
+    
+    x,y = fq.ezdiff(lags, crossCorr)
+    
+    f = interp.interp1d(x, y, kind = 'cubic')
+    
+    err = 1
+    threshold = 1e-5
+    maxIter = 1000
+    nIter = 0
+    x0 = peakFreq - 5*Df
+    x1 = peakFreq + 5*Df
+        
+    while err > threshold:
+        nIter += 1
+        if nIter > maxIter:
+            break
+            
+        if x0<np.min(x):
+            x0 = np.min(x)
+        if x0>np.max(x):
+            x0 = np.max(x)
+            
+        if x1<np.min(x):
+            x1 = np.min(x)
+        if x1>np.max(x):
+            x1 = np.max(x)
+                
+        f0 = f(x0)
+        f1 = f(x1)
+        dfdx = (f1-f0) / (x1 - x0)
+        b = f0 - dfdx*x0
+        
+        x0 = x1
+        x1 = -b/dfdx
+        err = abs((x1-x0)/x0)
+        
+         
+    
+    upconvWavelength = C/x1# -(N - (maxId+1))*df
+    
+    
+    return upconvWavelength
 
 def make1Dfft(wavelengths,stagePosition,trace,zeropadding = True, windowing = True, debugGraphs= False):
 
