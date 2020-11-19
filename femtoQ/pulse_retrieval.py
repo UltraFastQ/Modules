@@ -329,16 +329,20 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     
     
     delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits)
-    
+
+    """ Recenter the trace to zero delay. Otherwise copra behaves weirdly"""
     marginal_t = simpson(trace,wavelengths,axis = 1)
     t_0 = delays[np.argmax(marginal_t)]
     delays -= t_0
     
+    """ Removing negative values from trace. Seems to give slightly better results"""
+    trace[trace<0] = 0
     
+    """ PCGPA algorithm requires a symmetric grid """
     if method.lower() == 'pcgpa':
         symmetrizeGrid = True
     
-    
+    """ Adjust grid size if required """
     if symmetrizeGrid:
         if gridSize is None:
             gridSize = [len(wavelengths),len(wavelengths)]
@@ -368,49 +372,51 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         delays = symDelays
         dt = np.mean(np.diff(delays))
     
-    # Define time/frequency grids for input pulse
+    """ Define time/frequency grids for input pulse """
     if gridSize is not None:
         ft = pypret.FourierTransform(gridSize[1], dt = dt)
     else:
         ft = pypret.FourierTransform(len(delays), dt = dt)
     
-    # Integrate over delay axis
+    """ Integrate over delay axis"""
     marginal_w = simpson(trace,delays,axis = 0)
     
         
-    
+    """ Carrier wavelength """
     lambda_0 = C/(simpson(C/wavelengths[-1::-1]*marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)/simpson(marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)) * 2
     
-    
+    """ Marginal correction: compare frequnecy marginal to spectrum autoconvolution.
+        Relative differences between the two should correspond to experimental
+        bandwidth limitation. Trace is adjusted accordingly to offset this effect. """
     if marginalCorrection is not None:
         data = np.load(marginalCorrection)
         corrWavelengths = data['wavelengths']*1e-9
         corrSpectrum = data['spectrum']
         
+        corrSpectrumRaw = np.copy(corrSpectrum)
         
-        corrW = np.linspace(2*np.pi*C/corrWavelengths[-1],2*np.pi*C/corrWavelengths[0],len(corrWavelengths))
-        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1] )(corrW)
-        W_0 = simpson(corrW*corrSpectrum,corrW)/simpson(corrSpectrum,corrW)
+        corrW = np.linspace(-4*np.pi*C/corrWavelengths[0],4*np.pi*C/corrWavelengths[0],4*len(corrWavelengths)+1)
         
+        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1] ,bounds_error=False,fill_value=0)(corrW)
         
-        delta_w = corrW[1]-corrW[0]
-        autoConv = np.correlate(corrSpectrum,corrSpectrum,"full")*delta_w
-        absc_conv = delta_w*np.linspace(-len(autoConv)/2,len(autoConv)/2,len(autoConv))
+        x,y = fq.ezifft(corrW,corrSpectrum)
+        absc_conv,autoConv = fq.ezfft(x,y**2,neg = True) 
+        autoConv = np.real(autoConv)
+
         
-        plt.figure()
-        plt.plot((-absc_conv[-1::-1]),autoConv[-1::-1])
+        autoConv = interp(absc_conv, autoConv,bounds_error=False,fill_value=0)(2*np.pi*C/wavelengths)
         
-        autoConv = interp(absc_conv, autoConv)(2*np.pi*C*(1/wavelengths-2/lambda_0))
-        
-        
-        marginalCorr = ( autoConv/autoConv.max() ) / ( marginal_w / marginal_w.max() )
-        
+        marginal_w_corr = np.copy(marginal_w)
+        marginal_w_corr[marginal_w_corr<=0] = marginal_w_corr[marginal_w_corr>0].min()
+        marginal_w_corr = fq.ezsmooth(marginal_w_corr,15,'hanning')
+        marginalCorr = ( autoConv/autoConv.max() ) / ( marginal_w_corr / marginal_w_corr.max() )
+
         for ii, delay in enumerate(delays):
             trace[ii,:]*=marginalCorr
         
         plt.figure()
         plt.plot(wavelengths*1e9,autoConv/autoConv.max(),label = 'From spectrum')
-        plt.plot(wavelengths*1e9,marginal_w / marginal_w.max(), label = 'From FROG trace')
+        plt.plot(wavelengths*1e9,marginal_w_corr / marginal_w_corr.max(), label = 'From FROG trace')
         plt.xlabel('Wavelengths [nm]')
         plt.ylabel('Frequency margianal')
         plt.legend()
@@ -421,23 +427,23 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         plt.ylabel('Marginal correction factor')
         
     
-    # Instantiate a pulse object w/ appropriate central wavelength
-    # (other parameters don't matter here)
+    """ Instantiate a pulse object w/ appropriate carrier wavelength
+        (other parameters don't matter here)"""
     pulseP = pypret.Pulse(ft, lambda_0)
     pypret.random_gaussian(pulseP, 1e-15, phase_max=0.0)
         
-    # Instantiate a PNPS object for SHG-FROG technique
+    """ Instantiate a PNPS object for SHG-FROG technique"""
     pnps = pypret.PNPS(pulseP, "frog", "shg")
     pnps.calculate(pulseP.spectrum, delays)
     
-    # Export SHG frequency grid
+    """ Export SHG frequency grid """
     w_shg = pnps.process_w
     w_fund = pulseP.w+pulseP.w0
     
     
     
     
-    # Interpolate trace to shg frequency grid
+    """ Interpolate trace to shg frequency grid """
     trace_w = np.zeros((len(delays),len(w_shg)))
     for ii,delay in enumerate(delays):  
     
@@ -447,7 +453,7 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         
     
     
-    # Plot interpolated trace (to check interpolation errors)
+    """ Plot interpolated trace (to check interpolation errors) """
     plt.figure()
     plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg)*1e9,trace_w.transpose())
     if marginalCorrection is None:
@@ -459,12 +465,15 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     plt.ylim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
     plt.colorbar()
 
-    # Reformat trace for retriever
+    """ Reformat trace for retriever """
     traceInput = pypret.mesh_data.MeshData(trace_w,delays,w_shg,labels = ['Delay','Frequency',''])
 
 
-    # Apply RANA approach to get 1st estimate of input spectrum
-    
+    """ Initial guess for iterative algorithm. Three options:
+        Gaussian (default): Fits a gaussian pulse to both the time & freq. marginals. Struggles w/ non-bell-shaped spectra.
+        Spectrum: Takes the independantly measured spectrum as initial guess with flat phase.
+        RANA: Uses "RANA" algorithm to deduce the spectrum from the trace. Uses flat phase. Struggles w/ noise."""
+        
     if initialGuess.lower() == 'gaussian':
         if tau is None:
             autocorr =  simpson(trace,wavelengths,axis = 1)
@@ -483,25 +492,36 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         
         w_0 = 2*np.pi*C/lambda_0
         initialGuess = np.complex128(np.exp(- (w_fund-w_0)**2 / dw**2)) * np.exp(1j*GDD*(w_fund-w_0)**2)
-        
+    
+    elif (initialGuess.lower()=='spectrum') & (marginalCorrection is not None):
+       initialGuess = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrumRaw[-1::-1] ,bounds_error=False, fill_value=0)(w_fund)
+       initialGuess[initialGuess<0]=0
+       initialGuess = np.complex128(initialGuess**0.5)
+       initialGuess /= initialGuess.max()
     else:
         initialGuess = library_frog.RANA(delays,w_shg,trace_w,w_fund)
     
     
-    # Instantiate retriver
+    """ Instantiate retriever """
     ret = pypret.Retriever(pnps,method =  method, verbose=True, maxiter=maxIter)
 
 
-    # Apply retrieval algorithm and print results
+    """ Apply retrieval algorithm and print results """
     ret.retrieve(traceInput, initialGuess)
     results = ret.result()
     
-    # Export retrieved pulse & trace
-    pulseRetrieved = fq.ezsmooth(results.pulse_retrieved, window = 'hanning')
+    """ Export retrieved pulse & trace """
+    pulseRetrieved = results.pulse_retrieved
     traceRetrieved = results.trace_retrieved
     pulseFrequencies = w_fund/(2*np.pi)
     traceFrequencies = w_shg/(2*np.pi)
     
-    library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
-
+    """ Make plots """
+    axSpectrum = library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
+    
+    if marginalCorrection is not None:
+        axSpectrum.plot(corrWavelengths*1e9,corrSpectrumRaw/corrSpectrumRaw.max(),'g--',linewidth = 3,label = 'Measured')
+    
+    axSpectrum.legend()
+    
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths
