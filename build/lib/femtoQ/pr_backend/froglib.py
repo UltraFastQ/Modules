@@ -81,7 +81,6 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     axR = axL.twinx()
     axL.plot(wavelengths[II]*1e9,np.abs(initialGuess[II])**2,'r',linewidth = 3,label = 'Initial guess')
     axL.plot(wavelengths[II]*1e9,np.abs(pulseRetrieved[II])**2 / np.max(np.abs(pulseRetrieved[II])**2),'k',linewidth = 3,label = 'Retrieved spectrum')
-    axL.legend()
     axL.set_ylabel('Normalized power density')
     axL.set_xlabel('Wavelengths [nm]')
     axR.set_ylabel('Spectral phase (x $\pi$) [rad]')
@@ -101,7 +100,7 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     plt.ylim(wavelengthsSpectro[0]*1e9,wavelengthsSpectro[-1]*1e9)
     plt.colorbar()
 
-    return
+    return axL
 
 
 def freq2time(frequency, spectrum):
