@@ -130,7 +130,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
         plt.figure()
         plt.plot(fundWavelengths*1e9,fundPowerSpectrum/fundPowerSpectrum.max(), label = 'Fundamental spectrum')
         plt.plot(1/(1/wavelengths-1/upconvWavelength)*1e9, upconvPowerSpectrum/upconvPowerSpectrum.max(),'--r', label = 'Un-upconverted spectrum')
-        plt.ylim([0,1])
+        plt.ylim([0,1.05])
         plt.xlabel('Wavelengths [nm]')
         plt.ylabel('Normalized power density')
         plt.legend()
@@ -231,12 +231,12 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     ax.plot(tConc*1e15, pulseConc/np.max(pulseConc), '--b', label = 'Concat.')
     ax.plot(tMidpoint*1e15, pulseMidpoint/np.max(pulseMidpoint), '--r', label = 'Midpoint')
     ax.plot(tLim*1e15, pulseLim/np.max(pulseLim), 'k', label = 'Fourier lim.')
-    ax.set_ylim([0,1])
+    ax.set_ylim([0,1.05])
     ax.set_xlabel('Time [fs]')
     ax.set_ylabel('Normalised intensity')
     if simulatedData:
         ax.plot(timeVector*1e15, inputPulse, '-.g', label = 'Sim. input')
-        ax.set_ylim([0,1])
+        ax.set_ylim([0,1.05])
     ax.legend()
     ax.set_xlim([-150, 150])
     
@@ -275,7 +275,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     
     axLeft.plot(1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum/np.max(upconvPowerSpectrum), '-b', linewidth = 2)
-    axLeft.set_ylim[(0,1)]
+    axLeft.set_ylim([0,1.05])
     axRight = axLeft.twinx()
     axRight.plot(lambdaGDD[IIGDD], concGD[IIGDD], '--r', linewidth = 2, label = 'Concat.')
     axRight.plot(2*np.pi*2.998e8/midpointW[1:-1][((midpointW[1:-1]>w1) & (midpointW[1:-1]<w2))]*1e9, midpointGD[((midpointW[1:-1]>w1) & (midpointW[1:-1]<w2))]*1e15, '--k', linewidth = 2, label = 'Midpoint')
@@ -287,7 +287,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     fig2 = plt.figure()
     axLeft2 = fig2.gca()
     axLeft2.plot(1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum / np.max(upconvPowerSpectrum), '-b', linewidth = 2)
-    axLeft2.set_ylim([0,1])
+    axLeft2.set_ylim([0,1.05])
     axRight2 = axLeft2.twinx()
     axRight2.plot(lambdaPhase[IIphase], concPhase[IIphase], '--r', linewidth = 2)
     axLeft2.set_xlabel('Wavelength [nm]')
@@ -424,14 +424,14 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         plt.plot(wavelengths*1e9,marginal_w_corr / marginal_w_corr.max(), label = 'From FROG trace')
         plt.xlabel('Wavelengths [nm]')
         plt.ylabel('Frequency margianal')
-        plt.ylim([0,1])
+        plt.ylim([0,1.05])
         plt.legend()
         
         plt.figure()
         plt.plot(wavelengths*1e9,marginalCorr)
         plt.xlabel('Wavelengths [nm]')
         plt.ylabel('Marginal correction factor')
-        plt.ylim([0,1])
+        plt.ylim(bottom=0)
     
     """ Instantiate a pulse object w/ appropriate carrier wavelength
         (other parameters don't matter here)"""
@@ -527,7 +527,7 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     
     if marginalCorrection is not None:
         axSpectrum.plot(corrWavelengths*1e9,corrSpectrumRaw/corrSpectrumRaw.max(),'g--',linewidth = 3,label = 'Measured')
-        axSpectrum.set_ylim([0,1])
+        axSpectrum.set_ylim([0,1.05])
     axSpectrum.legend()
     
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths
