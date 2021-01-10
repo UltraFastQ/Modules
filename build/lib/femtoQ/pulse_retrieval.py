@@ -327,7 +327,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     plt.show()
     
-    return
+    return lambdaPhase[IIphase], concPhase[IIphase]
     
     
 def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
