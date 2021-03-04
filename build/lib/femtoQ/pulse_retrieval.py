@@ -214,6 +214,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     """ Realign pulse's peak intensity to t = 0 fs """
     tpeak = tConc[ np.argmax(pulseConc)]
     pulseConc = np.interp(tConc, tConc-tpeak, pulseConc)
+    Econc = np.interp(tConc, tConc-tpeak, Econc)
     
     tpeak = tMidpoint[ np.argmax(pulseMidpoint)]
     pulseMidpoint = np.interp(tMidpoint, tMidpoint-tpeak, pulseMidpoint)
@@ -327,7 +328,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     plt.show()
     
-    return lambdaPhase[IIphase], concPhase[IIphase]
+    return lambdaPhase, concPhase, tConc, Econc
     
     
 def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
