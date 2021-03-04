@@ -361,7 +361,7 @@ def make1Dfft(wavelengths,stagePosition,trace,zeropadding = True, windowing = Tr
                
 def cut_fft(amplitude, phase, wavelengths,debugGraphs):
     
-    cut = 0.01
+    cut = 0.00
     extend = 0
     
     Icut = amplitude >= cut*np.max(amplitude)
