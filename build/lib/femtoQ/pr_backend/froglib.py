@@ -86,10 +86,10 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     axR.set_ylabel('Spectral phase (x $\pi$) [rad]')
     
     retrievedPhase = np.unwrap(np.angle(pulseRetrieved))
-    retrievedPhase -= np.average(retrievedPhase,weights = np.abs(pulseRetrieved[II])**2)
+    retrievedPhase -= np.average(retrievedPhase[II],weights = np.abs(pulseRetrieved[II])**2)
     
-    axR.plot(wavelengths[II][IIplotphase]*1e9,retrievedPhase[IIplotphase]/np.pi,'--k')
-    axR.set_ylim(retrievedPhase[IIplotphase].min()-np.abs(retrievedPhase[IIplotphase].min()*0.1)/np.pi,retrievedPhase[IIplotphase].max()*1.1/np.pi)
+    axR.plot(wavelengths[II][IIplotphase]*1e9,retrievedPhase[II][IIplotphase]/np.pi,'--k')
+    axR.set_ylim(retrievedPhase[II][IIplotphase].min()-np.abs(retrievedPhase[II][IIplotphase].min()*0.1)/np.pi,retrievedPhase[II][IIplotphase].max()*1.1/np.pi)
     plt.xlim(wavelengthsSpectro[0]*1.8e9,wavelengthsSpectro[-1]*2.2e9)
     
     plt.figure()
