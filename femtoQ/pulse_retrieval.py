@@ -248,7 +248,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     return tConc, Econc, Emidpoint
     
     
-def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, smoothTrace = True, relativeNoiseTreshold = 0, marginalCorrection = None):
+def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, smoothTrace = True, relativeNoiseTreshold = 0, marginalCorrection = None,inputDelays = None, inputWavelengths = None, inputTrace = None,makeFigures = True):
     
     """
     Uses pypret retrieval module developped by Nils C. Geib at the Institute of Applied Physics of the University of Jena, Germany.
@@ -257,7 +257,12 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     
     """
     
-    delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits)
+    if (inputDelays is not None) & (inputWavelengths is not None) & (inputTrace is not None):
+         delays = inputDelays
+         wavelengths  = inputWavelengths
+         trace = inputTrace
+    else:
+         delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits,makeFigures)
 
     """ Recenter the trace to zero delay. Otherwise copra behaves weirdly"""
     marginal_t = simpson(trace,wavelengths,axis = 1)
@@ -347,20 +352,20 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
 
         for ii, delay in enumerate(delays):
             trace[ii,:]*=marginalCorr
-        
-        plt.figure()
-        plt.plot(wavelengths*1e9,autoConv/autoConv.max(),label = 'From spectrum')
-        plt.plot(wavelengths*1e9,marginal_w_corr / marginal_w_corr.max(), label = 'From FROG trace')
-        plt.xlabel('Wavelengths [nm]')
-        plt.ylabel('Frequency margianal')
-        plt.ylim([0,1.05])
-        plt.legend()
-        
-        plt.figure()
-        plt.plot(wavelengths*1e9,marginalCorr)
-        plt.xlabel('Wavelengths [nm]')
-        plt.ylabel('Marginal correction factor')
-        plt.ylim(bottom=0)
+        if makeFigures:
+            plt.figure()
+            plt.plot(wavelengths*1e9,autoConv/autoConv.max(),label = 'From spectrum')
+            plt.plot(wavelengths*1e9,marginal_w_corr / marginal_w_corr.max(), label = 'From FROG trace')
+            plt.xlabel('Wavelengths [nm]')
+            plt.ylabel('Frequency margianal')
+            plt.ylim([0,1.05])
+            plt.legend()
+            
+            plt.figure()
+            plt.plot(wavelengths*1e9,marginalCorr)
+            plt.xlabel('Wavelengths [nm]')
+            plt.ylabel('Marginal correction factor')
+            plt.ylim(bottom=0)
     
     """ Instantiate a pulse object w/ appropriate carrier wavelength
         (other parameters don't matter here)"""
@@ -389,16 +394,17 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     
     
     """ Plot interpolated trace (to check interpolation errors) """
-    plt.figure()
-    plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg[w_shg>0])*1e9,trace_w[:,w_shg>0].transpose() / (trace_w[:,w_shg>0].transpose()).max() ,shading='auto')
-    if marginalCorrection is None:
-        plt.title('Input trace (interpolated)')
-    else:
-        plt.title('Input trace (corrected + interpolated)')
-    plt.xlabel('Delay [fs]')
-    plt.ylabel('Wavelengths [nm]')
-    plt.ylim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
-    plt.colorbar()
+    if makeFigures:
+        plt.figure()
+        plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg[w_shg>0])*1e9,trace_w[:,w_shg>0].transpose() / (trace_w[:,w_shg>0].transpose()).max() ,shading='auto')
+        if marginalCorrection is None:
+            plt.title('Input trace (interpolated)')
+        else:
+            plt.title('Input trace (corrected + interpolated)')
+        plt.xlabel('Delay [fs]')
+        plt.ylabel('Wavelengths [nm]')
+        plt.ylim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
+        plt.colorbar()
 
     """ Reformat trace for retriever """
     traceInput = pypret.mesh_data.MeshData(trace_w,delays,w_shg,labels = ['Delay','Frequency',''])
@@ -452,14 +458,15 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     traceFrequencies = w_shg/(2*np.pi)
     
     """ Make plots """
-    axSpectrum = library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
+    if makeFigures:
+        axSpectrum = library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
     
-    if marginalCorrection is not None:
-        refSpectrum = corrSpectrumRaw * corrWavelengths**2/C
-        refSpectrum /= refSpectrum.max()
-        refSpectrum = np.interp(pulseFrequencies[pulseFrequencies>0], C/corrWavelengths[-1::-1],refSpectrum[-1::-1])
-        axSpectrum.plot(pulseFrequencies[pulseFrequencies>0] / 1e12,refSpectrum,'g--',linewidth = 3,label = 'Measured')
-        axSpectrum.set_ylim([0,1.05])
-    axSpectrum.legend()
+        if marginalCorrection is not None:
+            refSpectrum = corrSpectrumRaw * corrWavelengths**2/C
+            refSpectrum /= refSpectrum.max()
+            refSpectrum = np.interp(pulseFrequencies[pulseFrequencies>0], C/corrWavelengths[-1::-1],refSpectrum[-1::-1])
+            axSpectrum.plot(pulseFrequencies[pulseFrequencies>0] / 1e12,refSpectrum,'g--',linewidth = 3,label = 'Measured')
+            axSpectrum.set_ylim([0,1.05])
+        axSpectrum.legend()
     
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths

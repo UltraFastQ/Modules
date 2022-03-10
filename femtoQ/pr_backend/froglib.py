@@ -22,7 +22,7 @@ def get_FWHM(t,I_t):
 
     return t_2-t_1
 
-def unpack_data(filename,wavelengthLimits):
+def unpack_data(filename,wavelengthLimits,makeFigures):
     
     data = np.load(filename)
     
@@ -37,13 +37,13 @@ def unpack_data(filename,wavelengthLimits):
     data.close()
     
     
-
-    plt.figure()
-    plt.pcolormesh(delays*1e15,wavelengthsSpectro*1e9,trace.transpose(),shading = 'auto')
-    plt.title('Measured trace')
-    plt.ylabel('Wavelengths [nm]')
-    plt.xlabel('Delay [fs]')
-    plt.colorbar()
+    if makeFigures:
+        plt.figure()
+        plt.pcolormesh(delays*1e15,wavelengthsSpectro*1e9,trace.transpose(),shading = 'auto')
+        plt.title('Measured trace')
+        plt.ylabel('Wavelengths [nm]')
+        plt.xlabel('Delay [fs]')
+        plt.colorbar()
 
 
     
