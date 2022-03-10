@@ -6,6 +6,8 @@ femtoMod.egg-info/SOURCES.txt
 femtoMod.egg-info/dependency_links.txt
 femtoMod.egg-info/top_level.txt
 femtoQ/__init__.py
+femtoQ/debuggingTests.py
+femtoQ/fft_benchmark.py
 femtoQ/plotting.py
 femtoQ/plotting_example.py
 femtoQ/pulse_retrieval.py
