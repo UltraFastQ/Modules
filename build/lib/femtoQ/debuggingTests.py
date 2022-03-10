@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import simulate_pulse_retrieval as spr
 import pulse_retrieval as pr
+from scipy.interpolate import interp1d as interp
 
 # =============================================================================
 # N = 2**17
@@ -97,7 +98,45 @@ import pulse_retrieval as pr
 
 # =============================================================================
 # spr.FROG()
-# pr.shgFROG('simFrogData.npz', initialGuess = 'gaussian', smoothTrace = False, relativeNoiseTreshold=0.00,maxIter = 100,marginalCorrection = 'simFROGspectrum.npz')
+# =============================================================================
+pulseRetrieved, pulseFrequencies = pr.shgFROG('simFrogData.npz', initialGuess = 'gaussian', smoothTrace = False, relativeNoiseTreshold=0.00,maxIter = 100,marginalCorrection = 'simFROGspectrum.npz',makeFigures = False)[0:3:2]
+
+# =============================================================================
+# 
+# # Interpolate over new frequency grid, including negative w components
+# freq_max = pulseFrequencies[-1]
+# N = len(pulseFrequencies)
+# dv = freq_max/(N/2-1)
+# freq_min = -freq_max/(N/2)
+#     
+# new_freq_grid = np.linspace(freq_min,freq_max,N)
+# 
+# amp = np.abs(pulseRetrieved)
+# phase = np.unwrap(np.angle(pulseRetrieved))
+# 
+# new_amp = interp(new_freq_grid,amp,'quadratic',bounds_error=False,fill_value=0)(new_freq_grid)
+# new_phase = interp(new_freq_grid,phase,'quadratic',bounds_error=False,fill_value=0)(new_freq_grid)
+#      
+# 
+# spectrum_interpolated = new_amp*np.exp(1j*new_phase)
+#      
+# 
+# 
+# 
+# # =============================================================================
+# # E = np.fft.ifft(pulseRetrieved)
+# # t = np.fft.fftfreq(pulseFrequencies.shape[0],np.mean(np.diff(pulseFrequencies)))
+# # =============================================================================
+# t, E = pr.freq2time(pulseFrequencies, pulseRetrieved)
+# 
+# plt.figure()
+# plt.plot(t,np.abs(E)**2)
+# 
+# 
+# plt.figure()
+# plt.plot(pulseFrequencies,np.abs(pulseRetrieved)**2)
+# plt.twinx()
+# plt.plot(pulseFrequencies,np.unwrap(np.angle(pulseRetrieved)))
 # =============================================================================
 
 # =============================================================================
