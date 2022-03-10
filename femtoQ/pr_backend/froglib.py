@@ -39,7 +39,7 @@ def unpack_data(filename,wavelengthLimits):
     
 
     plt.figure()
-    plt.pcolormesh(delays*1e15,wavelengthsSpectro*1e9,trace.transpose())
+    plt.pcolormesh(delays*1e15,wavelengthsSpectro*1e9,trace.transpose(),shading = 'auto')
     plt.title('Measured trace')
     plt.ylabel('Wavelengths [nm]')
     plt.xlabel('Delay [fs]')
@@ -60,8 +60,8 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     E = interp(t-t0,E,'quadratic',bounds_error=False,fill_value=0)
     E = E(t)
     
-    print('FWHM duration: ' + str( round(get_FWHM(t, np.abs(E)**2)*1e15,1) ) + ' fs')
-    print('FWHM duration: ' + str( round(get_FWHM(t, np.abs(E_cmp)**2)*1e15,1) ) + ' fs')
+    print('Measured FWHM duration: ' + str( round(get_FWHM(t, np.abs(E)**2)*1e15,1) ) + ' fs')
+    print('Fourier-lim. FWHM duration: ' + str( round(get_FWHM(t, np.abs(E_cmp)**2)*1e15,1) ) + ' fs')
     
     plt.figure()
     plt.plot(t*1e15,np.abs(E)**2 / np.max(np.abs(E)**2),'b',label = 'Retrieved')
@@ -74,26 +74,26 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     wavelengths = C/(pulseFrequencies)
     II = np.argsort(wavelengths)
     
-    IIplotphase = ( np.abs(pulseRetrieved[II])**2 / np.max(np.abs(pulseRetrieved[II])**2) ) > 0.1
     
     plt.figure()
     axL = plt.gca()
     axR = axL.twinx()
-    axL.plot(wavelengths[II]*1e9,np.abs(initialGuess[II])**2,'r',linewidth = 3,label = 'Initial guess')
-    axL.plot(wavelengths[II]*1e9,np.abs(pulseRetrieved[II])**2 / np.max(np.abs(pulseRetrieved[II])**2),'k',linewidth = 3,label = 'Retrieved spectrum')
+    axL.plot(pulseFrequencies/1e12,np.abs(initialGuess)**2,'r',linewidth = 3,label = 'Initial guess')
+    axL.plot(pulseFrequencies/1e12,np.abs(pulseRetrieved)**2 / np.max(np.abs(pulseRetrieved[II])**2),'k',linewidth = 3,label = 'Retrieved spectrum')
     axL.set_ylabel('Normalized power density')
-    axL.set_xlabel('Wavelengths [nm]')
-    axR.set_ylabel('Spectral phase (x $\pi$) [rad]')
+    axL.set_xlabel('Frequency [THz]')
+    axR.set_ylabel('Spectral phase [rad]')
     
     retrievedPhase = np.unwrap(np.angle(pulseRetrieved))
     retrievedPhase -= np.average(retrievedPhase[II],weights = np.abs(pulseRetrieved[II])**2)
     
-    axR.plot(wavelengths[II][IIplotphase]*1e9,retrievedPhase[II][IIplotphase]/np.pi,'--k')
-    axR.set_ylim(retrievedPhase[II][IIplotphase].min()-np.abs(retrievedPhase[II][IIplotphase].min()*0.1)/np.pi,retrievedPhase[II][IIplotphase].max()*1.1/np.pi)
-    plt.xlim(wavelengthsSpectro[0]*1.8e9,wavelengthsSpectro[-1]*2.2e9)
+    IIplot = np.abs(pulseRetrieved)**2 > (np.abs(pulseRetrieved)**2).max()/20
+    
+    axR.plot(pulseFrequencies[IIplot]/1e12,retrievedPhase[IIplot],'--k')
+    plt.xlim(C/(wavelengthsSpectro[-1]*2.5)/1e12, C/(wavelengthsSpectro[0]*1.8)/1e12)
     
     plt.figure()
-    plt.pcolormesh(delays*1e15,(C/traceFrequencies)*1e9,traceRetrieved.transpose())
+    plt.pcolormesh(delays*1e15,(C/traceFrequencies[traceFrequencies>0])*1e9,traceRetrieved[:,traceFrequencies>0].transpose() / (traceRetrieved[:,traceFrequencies>0].transpose()).max(),shading='auto')
     plt.title('Retrieved trace')
     plt.ylabel('Wavelengths [nm]')
     plt.xlabel('Delay [fs]')

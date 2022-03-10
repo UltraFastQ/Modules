@@ -1,0 +1,7 @@
+
+*.pyc
+*.npz
+femtoQ/debuggingTests.py
+*.eps
+*.pdf
+*.png

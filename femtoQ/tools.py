@@ -20,6 +20,29 @@ import matplotlib.pyplot as plt
 import scipy as sp
 from scipy.optimize import curve_fit
 
+#%% Optional modules
+optionalModules= {
+    'pyfftw' : True,
+    'mkl_fft' : True,
+    'cupy' : True,
+}
+try:
+    import pyfftw                     
+except ImportError:
+    optionalModules['pyfftw'] = False
+try:
+    import mkl_fft                     
+except ImportError:
+    optionalModules['mkl_fft'] = False
+try:
+    import cupy        
+except ImportError:
+    optionalModules['cupy'] = False
+    
+if optionalModules['pyfftw']:
+    import multiprocessing
+    pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
+    pyfftw.interfaces.cache.enable()
 
 #%% Set constants and recurrant functions
 C = sc.c                          # Speed of light
@@ -30,7 +53,7 @@ from numpy import exp         # Exponential
 
 #%% Methods and classes
 
-def ezfft(t, S, normalization = "ortho", neg = False):
+def ezfft_old(t, S, normalization = "ortho", neg = False):
     """ 
     Description: Returns the Fourier transform of S and the frequency vector associated with it
     
@@ -60,8 +83,76 @@ def ezfft(t, S, normalization = "ortho", neg = False):
 
     return f,y
 
+def ezfft(t, S, axis = -1, backend = 'mkl', neg = True):
+    """ 
+    Description: Returns the Fourier transform of S and the frequency vector f associated with it.
+    Normalization factors are automatically applied to maintain Parseval's theorem. Aimed to
+    simplify fft usage, NOT for high-performance.
+    
+    Inputs:
+        - t: array_like
+            Time vector [seconds]
+        - S: array_like
+            Complex maplitude signal vector [arb.u.]
+        - neg: bool, optional
+            Choose whether or not to include negative frequencies components in output.
+        - axis: int, optional
+            Axis along which to take the fft for arrays with N>1 dimensions. -1 flattens the array.
+        - backend: str, optional
+            Python library that is called to perform the fft. Numpy is called by default for 
+            maximal compatibility, although it is usually the slowest one.
+    
+    Outputs:
+        - f: ndarray
+            Frequency vector [Hz]
+        - y: complex ndarray
+            Complex amplitude vector [arb.u. X Hz^-1]
+    """
+    
+    # Resolution and length of time vector
+    dt = np.diff(t).mean()
+    N = t.shape[-1]
+    
+    # Apply fft with chosen backend, if possible
+    if backend.lower() == 'mkl' and optionalModules['mkl_fft']:
+        y =  mkl_fft.fft(S,axis = axis) * dt
+        
+    elif backend.lower() == 'scipy':
+        y =  sp.fftpack.fft(S,axis = axis) * dt
+        
+    elif backend.lower() == 'pyfftw' and optionalModules['pyfftw']:        
+        y =  pyfftw.interfaces.scipy_fftpack.fft(S,axis = axis) * dt
+        
+    elif backend.lower() == 'cupy' and optionalModules['cupy']:
+        S = cupy.array(S)
+        y = cupy.asnumpy( cupy.fft.fft(S,norm='forward',axis = axis) * N * dt )
+        
+    else:
+        if backend.lower() == 'mkl':
+            print('mkl could not be loaded, defaulting to numpy.')
+        elif backend.lower() == 'pyfftw':
+            print('pyfftw could not be loaded, defaulting to numpy.')
+        elif backend.lower() == 'cupy':
+            print('cupy could not be loaded, defaulting to numpy.')
+        y =  np.fft.fft(S,norm='forward',axis = axis)  * N * dt
+        
+    
+    # Applying fftshift to get negative frequencies first
+    y = np.fft.fftshift( y )
+    
+    # Frequency vector
+    f = np.fft.fftshift( np.fft.fftfreq(t.shape[-1], d = dt) )
+    
+    # Remove negative frequencies if requested
+    if neg == False:
+        y = 2*y[f>0]
+        f = f[f>0]
 
-def ezifft(f, y, normalization = "ortho"):
+    return f, y
+
+
+
+def ezifft_old(f, y, normalization = "ortho"):
     """
     Description: Returns the inverse Fourier transform of y and the time vector associated with it.
     
@@ -89,16 +180,161 @@ def ezifft(f, y, normalization = "ortho"):
 
     return x,S
 
+def ezifft(f, y, axis = -1, amplitudeSpectrumRecentering = False, backend = 'mkl'):
+    """
+    Description: Returns the inverse Fourier transform of y and the time vector associated with it.
+    Normalization factors are automatically applied to maintain Parseval's theorem. Aimed to
+    simplify fft usage, NOT for high-performance.
+    
+    Inputs:
+        - f: array_like
+            Frequency vector [Hz]
+        - y: array_like
+            Complex amplitude vector [arb. u.]
+        - axis: int, optional
+            Axis along which to take the fft for arrays with N>1 dimensions. -1 flattens the array.
+        - amplitudeSpectrumRecentering: bool, optional
+            When True, adds the spectral phase necessary to get a zero-centered signal,
+            used mainly when calculating the transform-limited pulse of a spectrum.
+        - backend: str, optional
+            Python library that is called to perform the fft. Numpy is called by default for 
+            maximal compatibility, although it is usually the slowest one.
+    Outputs:
+        - t: array_like
+            Time vector [seconds]
+        - S: array_like
+            Signal vector [arb.u.] 
+    
+    Other comments: Negative frequencies components should be included in f and y vectors. Add them manually if needed. 
+    """
+    
+    # Resolution and length of frequency vector
+    df = np.diff(f).mean()
+    N = f.shape[-1]
+    
+    # Time vector
+    t = np.fft.fftshift( np.fft.fftfreq(f.shape[-1], d = df) )
+    
+    # Resolution and length of time vector
+    dt = np.diff(t).mean()
+    T = (N-1)*dt
+    
+    # Offset of time vector (necessary for invariance with fft, not sure why)
+    t += dt/2
+    
+    # Unshift the spectrum
+    y = np.fft.ifftshift( y )
+    
+    # Apply fft with chosen backend, if possible
+    if amplitudeSpectrumRecentering:
+        phaseCenteredPulse = np.exp(-1j*2*np.pi*f*(T/2) )
+        y = y * phaseCenteredPulse
+    
+    if backend.lower() == 'mkl' and optionalModules['mkl_fft']:
+        S =  mkl_fft.ifft( y ,axis = axis)  * df * N
+        
+    elif backend.lower() == 'scipy':
+        S=  sp.fftpack.ifft(y,axis = axis)  * df * N
+        
+    elif backend.lower() == 'pyfftw' and optionalModules['pyfftw']:        
+        S = pyfftw.interfaces.scipy_fftpack.ifft(y,axis = axis) * df * N
+        
+    elif backend.lower() == 'cupy' and optionalModules['cupy']:
+        y = cupy.array(y)
+        S = cupy.asnumpy( cupy.fft.fft(y,norm='forward',axis = axis) * df * N )
+        
+    else:
+        if backend.lower() == 'mkl':
+            print('mkl could not be loaded, defaulting to numpy.')
+        elif backend.lower() == 'pyfftw':
+            print('pyfftw could not be loaded, defaulting to numpy.')
+        elif backend.lower() == 'cupy':
+            print('cupy could not be loaded, defaulting to numpy.')
+        S = np.fft.ifft(y,norm='forward',axis = axis) * df
+        
+    
+    return t, S
 
 
 
-def ezsmooth(x, window_len=11, window='flat'):
+def powerSpectrum2fftAmplitudeSpectrum(wavelengths, powerDensity, frequencySpacing = 'average',powerOfTwo = ''):
+    """
+    Description: Converts a power spectrum in the same format as meausred with a
+    spectrometer into a amplitude spectrum ready for use as input in e.g. ifft.
+    
+    Inputs:
+        - wavelength: 1D array_like
+            Wavelength vector [m]
+        - powerDensity: 1D array_like
+            Power spectral density w.r.t. wavelengths [arb. u. X m^-1]
+        - frequencySpacing: float or int or str, optional
+            Desired resolution of the output frequency vector v [Hz]. Can be set
+            manually as a float or int. Otherwise, 'min' or 'max' will use the 
+            minimal or maximal resolution in the wavelength array, while 'average'
+            will use the average value (weigthed by the power density). The exact
+            resolution might be different due to rounding or when 
+        - powerOfTwo: str, optional
+            Option to change the output number of element to a power of 2 (which
+            accelerates ffts). If 'next', the array will be zero-padded to a larger
+            bandwidth while keeping the frequency resolution constant. If 'previous',
+            the array is interpolated to a lower-resolution frequency grid.
+    Outputs:
+        - v: array_like
+            Frequency vector [Hz]
+        - amplitude: array_like
+            Spectral amplitude vector [(arb.u. X m^-1)^1/2]
+    
+    Other comments: Negative frequencies components should be included in f and y vectors. Add them manually if needed. 
+    """
+    
+    # Highest measured frequency
+    vMax = C/wavelengths.min()
+    
+    # Determine frequency grid resolution
+    if type(frequencySpacing)==float or type(frequencySpacing)==int:
+        dv = float(frequencySpacing)
+    elif frequencySpacing.lower() == 'min':
+        dv = np.min( np.abs( np.diff( C/wavelengths ) ) )
+    elif frequencySpacing.lower() == 'max':
+        dv = np.max( np.abs( np.diff( C/wavelengths ) ) )
+    else:
+        dv = np.average( np.abs( np.diff( C/wavelengths ) ), weights = (powerDensity[0:-1]+powerDensity[1:])/2 )
+    
+    # Approximate length of output vectors
+    nApprox = 2*vMax/dv
+    
+    # Adjust size of grid to a power of two if requested
+    if powerOfTwo.lower() == 'next':
+        n = int(2**np.ceil(np.log2(nApprox)))
+    elif powerOfTwo.lower() == 'previous':
+        n = int(2**np.floor(np.log2(nApprox)))
+    else:
+        n = int(np.round(nApprox))
+        
+    # If output vectors are longer than input, the spectrum is effectively zero-padded
+    if n > nApprox:
+        vMax = dv*n / 2
+        
+    # Frequency grid
+    v = np.linspace(-vMax, vMax, n)
+    
+    # Interpolate power spectrum
+    powerDensity_v = np.interp(v, C/wavelengths[-1::-1], powerDensity[-1::-1]*wavelengths[-1::-1]**2/C, left = 0, right = 0)
+    
+    # Take the square-root to get an amplitude
+    amplitude = powerDensity_v**0.5
+    
+    return v, amplitude
+
+
+def ezsmooth(x, window_len=11, window='hanning'):
      """
      Description: Smooth the data using a window with requested size.
          This method is based on the convolution of a scaled window with the signal.
          The signal is prepared by introducing reflected copies of the signal
          (with the window size) in both ends so that transient parts are minimized
          in the begining and end part of the output signal.
+         Taken from https://scipy-cookbook.readthedocs.io/items/SignalSmooth.html
 
      Inputs:
          - x: array_like
@@ -114,33 +350,31 @@ def ezsmooth(x, window_len=11, window='flat'):
              Smoothed signal
      """
 
+     # Error checks
      if x.ndim != 1:
          raise ValueError("smooth only accepts 1 dimension arrays.")
-
      if x.size < window_len:
          raise ValueError("Input vector needs to be bigger than window size.")
-
-
      if window_len<3:
          return x
-     
      if (window_len % 2) == 0:
         window_len+=1
-
-
      if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
          raise ValueError("Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
-
+     # Reflect signal at the edges
      s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
 
-     if window == 'flat': #moving average
+     # Define the averaging window
+     if window == 'flat': #standard moving average
          w=np.ones(window_len,'d')
-     else:
+     else: # weigthed averaging
          w=eval('np.'+window+'(window_len)')
 
-     y=np.convolve(w/w.sum(),s,mode='valid')
-     return  y[int(np.ceil(window_len/2-1)):-int(np.ceil(window_len/2-1))]
+     # Convolving window with signal and keep values at the same positions as input
+     y=np.convolve(w/w.sum(),s,mode='valid')[int(np.ceil(window_len/2-1)):-int(np.ceil(window_len/2-1))]
+     
+     return  y
 
 
 def ezcorr(x, y1, y2, unbiased=False, Norm=False, Mean = False):
@@ -217,18 +451,18 @@ def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, 
 
     # Load profile, if any is specified
     if profile is not None:
-        if profile is 'HR2000':
+        if profile.lower() == 'hr2000':
             nbrcolumns = 2
             delimiter = '\t'
             decimalcomma = False
             skiprows = 0
 
-        if profile is 'testfile':
+        if profile.lower() == 'testfile':
             nbrcolumns = 3
             delimiter = ';'
             decimalcomma = False
             skiprows = 1
-        if profile is 'OSA':
+        if profile.lower() == 'osa':
             nbrcolumns = 2
             delimiter = '\t'
             decimalcomma = True
@@ -262,17 +496,17 @@ def ezcsvload(filename, nbrcolumns = 2, delimiter = '\t', decimalcomma = False, 
                         except:
                             print("1 data point failed")
 
-    if outformat is 'array': # Convert lists of values to numpy arrays
+    if outformat.lower()== 'array': # Convert lists of values to numpy arrays
         for outlist_index in range(nbrcolumns):
             outlist[outlist_index] = np.array(outlist[outlist_index])
 
     return outlist
 
 
-def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos = False):
+def ezfindwidth(x, y, halfwidth = False, height = 0.5, interpPoints = 1e6, rejectDoublePeaks = True):
     """
-    Description: Function that finds the width of an input signal or pulse. By default, the FWHM will be returned, unless height 
-                 and/or halfwidth options are changed. 
+    Description: Function that finds the width of an input signal or pulse. 
+    By default, the FWHM will be returned, unless height and/or halfwidth options are changed. 
                  
     Inputs: 
         - x: array_like 
@@ -285,10 +519,14 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
             Selects height for which width is calculated
         - interp points: int, optionnal
             Function will be interpolated to this number of points if the input has less points than this number
+        - rejectDoublePeaks: bool, optional
+            If True, returns nan (not a number) when the y crosses the height 
+            threshold more than twice. If False, returns the largest width.
         
     Outputs:
-        - width (defined in the same units (time, frequency, wavelength, etc.))
+        - width (defined in the same units as x (time, frequency, wavelength, etc.))
     """
+    
     # Ensure x is stricktly ascending
     IIsort = np.argsort(x)
     x = x[IIsort]
@@ -301,9 +539,9 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
     ytmp = (y - ymin) / ymax
 
     # Interpolate data for better accuracy, if necessary
-    if interp_points > len(x):
+    if interpPoints > len(x):
         # Interpolate data inside search domain for better accuracy
-        xinterp = np.linspace(x[0] , x[-1] ,int(interp_points))
+        xinterp = np.linspace(x[0] , x[-1] ,int(interpPoints))
         yinterp = np.interp(xinterp,x,ytmp)
     else:
         xinterp = x
@@ -323,7 +561,7 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
     else:
         width = xinterp[tmp2[-1]] - xinterp[tmp2[0]]
 
-    # Divide by two, if desired
+    # Divide by two, if half width is desired
     if halfwidth is True:
         width /= 2
         
@@ -334,28 +572,30 @@ def ezfindwidth(x, y, halfwidth = False, height = 0.5, interp_points = 1e6, pos 
 def ezdiff(x, y, n = 1, order = 2):
     """ 
     Description: Numerical differentiation based on centered finite-difference formulas.
+    Computes n-th derivative of y w.r.t x using order-th precision finite-difference.
     
     Inputs: 
         - x: array_like; increases monotically in constant increments dx
             abscissa
         - y: array_like
-            ordonate
+            ordinate
         - n: int
-            diffirentiates 'n' times
+            y is differentiated n times
         - order: 
             "order" parameter determines the order of the finite difference formula; 
-            it must be an even number greater than 0. High values of order can help 
-            precision or lead to significant numerical errors, depending on the situation.
-            2 is usually a safe value.
+            it must be an even number greater than 0. 2 is usually a safe value.
    Outputs:
        - xtrunc: array_like
            truncated abscissa
        - deriv: array_like
            nth derivative of y with respect to x.
+           
+    Comments: Honestly, while it works as intended to quickly take a derivative,
+    it often diverges for derivative orders > 2, so not as useful as I had hoped...
     """
 
     # X increments
-    dx = x[1] - x[0]
+    dx = np.diff(x).mean()
 
     # Number of finite difference coefficients to calculate
     nbr_coeff = 2 * math.floor( (n+1)/2 ) - 1 + order
@@ -383,8 +623,8 @@ def ezdiff(x, y, n = 1, order = 2):
     c = np.zeros_like(x[p:-p])
 
     # Evaluating finite difference, using Neumaier's improved Kahan summation
-    # algorithm. Using it should reduce numerical errors during summation,
-    # although it slows down calculations
+    # algorithm. Using it *should* reduce numerical errors during summation,
+    # although it slows down calculations.
     for ll in range(-p,p+1):
 
         new_term = (xvector[ll+p] * y[p+ll : len(y)-p+ll])/(dx**n)
@@ -405,7 +645,7 @@ def ezdiff(x, y, n = 1, order = 2):
     # Requested derivative, corrected
     deriv += c
 
-    # Appropriately truncated x vector for math and plotting
+    # Appropriately truncated x vector for further maths and for plotting
     xtrunc = x[p:-p]
 
 
@@ -488,7 +728,7 @@ def knife_edge_experiment(z = None, P = None, P0 = 0, P_max = None, plot = True)
     # Returns
     return params
     
-def ezpad(x, y, left, right, values=(50,50)):
+def ezpad(x, y, left, right, values=(0,0)):
     """
     Input :
     - x is the abscissa to pad, it is assumed to be a linear list
@@ -500,7 +740,7 @@ def ezpad(x, y, left, right, values=(50,50)):
     Padded x and y lists
     """
     y = np.pad(y, (left, right), 'constant', constant_values=values) # Use numpy pad function to pad y array
-    step = x[1] - x[0]
+    step = np.diff(x).mean()
     # Manually padding the x vector assuming it is linear
     x = np.append(np.linspace(x[0]-left*step, x[0]-step, left), x)
     x = np.append(x, np.linspace(x[-1]+step, x[-1]+right*step, right))
@@ -757,11 +997,11 @@ class Pulse:
         if self.t.all() == Pulse2.t.all():
             # Consider SFG without SHGs
             if SFGonly is True:
-                Atmp = self.E * Pulse2.E*1j
+                Atmp = self.E * Pulse2.E*-1j
             # Consider both SHGs and the SFG
             elif SFGonly is False:
                 E_tot =  self.E + Pulse2.E
-                Atmp = E_tot * E_tot*1j
+                Atmp = E_tot * E_tot*-1j
 
             f_nl, A_nl = ezfft(self.t, Atmp)
             return Pulse(t = self.t, E = Atmp), f_nl, A_nl
@@ -772,8 +1012,9 @@ class Pulse:
 
     def delay(self, timeDelay):
         """
-        Description: Delay the pulse in time domain by a value equal to timeDelay. Does not wrap it back once it reaches the
-            end of time vector t. A positive delay means the pulse's peak will shift towards negative time values.
+        Description: Delay the pulse in time domain by a value equal to timeDelay.
+        Does not wrap it back once it reaches the end of time vector t. 
+        A positive delay means the pulse's peak will shift towards positive time values.
             
         Inputs:
             - timeDelay: Time duration with which to delay the pulse [seconds]
@@ -783,7 +1024,7 @@ class Pulse:
                 Delayed pulse.
         """
         
-        newEfield = np.interp(self.t, self.t - timeDelay, self.E)
+        newEfield = np.interp(self.t, self.t + timeDelay, self.E)
         
         newPulse = Pulse(t = self.t, E = newEfield)
         

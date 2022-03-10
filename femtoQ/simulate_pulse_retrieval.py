@@ -20,42 +20,45 @@ def TwoDSI():
     
     
     #%% Simulation parameters
-    T = 10000e-15             # Time domain range. Higher values wield better frequency domain resolution
-    dt = 0.05e-15              # Time increments. Lower values wield better time domain resolution
+    T = 20000e-15             # Time domain range. Higher values wield better frequency domain resolution
+    dt = 0.1e-15              # Time increments. Lower values wield better time domain resolution
     
     lambda_1 = 0.5e-6         # Shortest wavelength to include in linear propagation calculations
     lambda_2 = 2e-6           # Longuest wavelength to include in linear propagation calculations
     
     #%% Physics parameters
-    tau_FWHM = 8e-15         # Initial pulse duration, full width at half maximum
-    lambda0 = 1300e-9         # Carrier wavelength of the pulse
+    tau_FWHM = 10e-15         # Initial pulse duration, full width at half maximum
+    lambda0 = 700e-9         # Carrier wavelength of the pulse
     
     
     chirpingMaterials = ['SF11', 'SF68', 'BK7', 'ZnSe'] # Dispersive elements through which your pulse under study is propagating
-    chirpingThicknesses = [ 0.00, 0.0 , 0.000 , 0.0000] # Dispersive materials thicknesses
+    chirpingThicknesses = [ 0.000, 0.0 , 0.000 , 0e-6] # Dispersive materials thicknesses
     
     tdsiMaterial = ['SF11', 'SF68', 'BK7', 'ZnSe']  # Dispersive elements in the long pulse branch of 2DSI
-    tdsiThicknesses = [ 0.00, 0.00, 2*2.54e-2+2e-3, 5e-3] # Dispersive materials thicknesses
+    tdsiThicknesses = [ 0.00, 0.00, 2*2.54e-2+2e-3, 0e-3] # Dispersive materials thicknesses
     
     # Manual values of dispersidon, up to 4th order for now
-    GDD = 0 * (1e-15)**2
-    TOD = 0 * (1e-15)**3
-    FOD =  0* (1e-15)**4
+    GDD = 100 * (1e-15)**2
+    TOD = -1000 * (1e-15)**3
+    FOD =  0 * (1e-15)**4
     
     #%% Setup parameters
     
     averageUpconvSpectrum = 1
     
-    noiseLevel = 0.0 # Gaussian noise on the simulated spectrometer. Signal peaks at 1
+    noiseLevel = 0.000 # Gaussian noise on the simulated spectrometer. Signal peaks at 1
     
     xSpectro = np.linspace(187e-9,1037e-9,2048) # Sampling points of the spectrometer, realistic values could be (187e-9,1037e-9,2048)
+    xSpectroFund = xSpectro[((xSpectro>470e-9)&(xSpectro<1500e-9))]
+    xSpectro = xSpectro[xSpectro>200e-9]
+    xSpectro = xSpectro[xSpectro<450e-9]
     
     ancillaType = "perfect" # Define source to use as ancilla (long pulse / monochromatic-like wave) use "real" to simulate dispersive arm, "perfect" for monochromatic waves
-    shearFrequency = 3.5e12 # Shear to set when using "perfect" ancilla
+    shearFrequency = 2e12 # Shear to set when using "perfect" ancilla
     stageShearScanMinMax = [0e-6, 10e-6] # Min/max position of piezo stage. Values closer to 0 lead to lower shear with "real" ancilla. Width should be at least 3x your center wavelength
-    stageTraceScanMinMax = [2e-6, 5e-6] # Min/max position of piezo stage. Values closer to 0 lead to lower shear with "real" ancilla. Width should be at least 3x your center wavelength
-    traceNumberDataPoints = 200 # Number of data points to acquire during stage displacement from min to max value
-    shearNumberDataPoints = 30 # Number of data points to acquire during stage displacement from min to max value
+    stageTraceScanMinMax = [5e-6, 8e-6] # Min/max position of piezo stage. Values closer to 0 lead to lower shear with "real" ancilla. Width should be at least 3x your center wavelength
+    traceNumberDataPoints = 2**7 # Number of data points to acquire during stage displacement from min to max value
+    shearNumberDataPoints = 100 # Number of data points to acquire during stage displacement from min to max value
     
     # %% Quick calculations
     #Pulse parameters
@@ -68,11 +71,14 @@ def TwoDSI():
     t = np.linspace(-T/2,T/2, round(T/dt) )
     
     # Time-domain electric field vector
-    E = np.exp(1j * w0 * t) * np.exp(-  (t)**2 / (tau)**2)
+    E = np.exp(1j * w0 * t) * ( np.exp(-  (t)**2 / (tau)**2)  + 0.5*np.exp(-  (t-5e-15)**2 / (3*tau)**2))#+ np.exp(1j * 1.05*w0 * (t-10e-15)) * np.exp(-  (t-10e-15)**2 / (tau)**2) 
     
     
     # Frequency domain e-field
-    v,s = fq.ezfft(t,E, neg = True)
+    v,s = fq.ezfft(t,E)
+    
+    
+    
     
     #%% Dispersion of pulse under study
     
@@ -80,11 +86,12 @@ def TwoDSI():
     w = 2*pi*v
     s_abs = np.abs(s)
     s_phase = np.unwrap(np.angle(s))
-    s_phase +=  (1/2 * GDD * (w-w0-2*pi*5e12)**2) + (1/6 * TOD * (w-w0)**3) + (1/24 * FOD * (w-w0)**4)
+    s_phase +=  (1/2 * GDD * (w-w0)**2) + (1/6 * TOD * (w-w0)**3) + (1/24 * FOD * (w-w0)**4)
     s = s_abs * np.exp(1j*s_phase)
     t, E = fq.ezifft(v,s)
     
     # Add material dispersion
+    spectralPhase = np.zeros_like(v)
     for ii, material in enumerate(chirpingMaterials):
         L = chirpingThicknesses[ii]
         
@@ -97,7 +104,7 @@ def TwoDSI():
         #%% Fast fourier transform
         
         # v is freqnecy vector, s is frequency-domain electric field vector
-        v,s = fq.ezfft(t,E, neg = True)
+        v,s = fq.ezfft(t,E)
         
         
         #%% Dispersive propagation
@@ -119,19 +126,20 @@ def TwoDSI():
         n[( (v>v1) & (v<v2) )] = ntmp
         
         # Apply material's spectral phase to frequency domain electric field
-        s[v!=0] = s[v!=0] * np.exp(1j * 2 * pi * n[v!=0] * (v[v!=0] / C) * L)
+        spectralPhase[v!=0] += 2 * pi * n[v!=0] * (v[v!=0] / C) * L
         
-        # Finalpulse's spectral phase
-        s_phase = np.unwrap(np.angle(s))
+    #spectralPhase += np.exp(-2*(v-450e12)**2/(1e12)**2)*np.pi/2
+    s = s * np.exp(1j * spectralPhase) 
+    # Finalpulse's spectral phase
+    s_phase = np.unwrap(np.angle(s))
         
-        #%% Inverse fast fourier transform
-        
-        # E2 is final time domain electric field vector, t2 is its corresponding time
-        # vector. If all works as intended, t2 is equivalent to t at this point
-        t2, E2 = fq.ezifft(v,s)
+    #%% Inverse fast fourier transform
+      
+    # E2 is final time domain electric field vector, t2 is its corresponding time
+    # vector. If all works as intended, t2 is equivalent to t at this point
+    t2, E2 = fq.ezifft(v,s)
     
-        E = E2
-        t = t2   
+    t,E = t2, E2
         
     
     # Find final pulse's peak in time
@@ -145,8 +153,7 @@ def TwoDSI():
     # Shift time vector to get peak at t=0
     E = np.interp(t, tExtended-tpeak, EExtended)
     
-    t2 = t
-    E2 = E
+    t2, E2 = t, E
     
         
     #%% Simulate 2DSI dispersive arm
@@ -162,7 +169,7 @@ def TwoDSI():
         #%% Fast fourier transform
         
         # v is freqnecy vector, s is frequency-domain electric field vector
-        v,s = fq.ezfft(t2,E2, neg = True)
+        v,s = fq.ezfft(t2,E2)
         
         
         #%% Dispersive propagation
@@ -224,7 +231,7 @@ def TwoDSI():
     phi_t = np.unwrap(np.angle(E2))
     
     # Instantaneous angular frequency
-    w_inst = (phi_t[2:] - phi_t[:-2]) / (t2[2] - t2[0])
+    t_inst, w_inst = fq.ezdiff(t2, phi_t)#(phi_t[2:] - phi_t[:-2]) / (t2[2] - t2[0])
     
     
     #%% Plotting
@@ -232,24 +239,25 @@ def TwoDSI():
     # Time domain initial/final pulse intensity
     figT = plt.figure()
     axT = figT.gca()
-    axT.plot(t*1e15,np.abs(E)**2,'b', label = 'Initial')
-    axT.plot(t2*1e15,np.abs(E2)**2,'--r', label = 'Final')
+    axT.plot(t*1e15,np.abs(E)**2,'b',linewidth = 2, label = 'Input pulse')
+    axT.plot(t2*1e15,np.abs(E2)**2,'--r',linewidth = 2, label = 'Ancilla')
     axT.legend(loc = 'best')
     #axT.set_xlim(-3*max([tau1,tau2])*1e15,3*max([tau1,tau2])*1e15)
     axT.set_xlabel('Time [fs]')
-    axT.set_ylabel('Intensity [arb. uni.]')
+    axT.set_ylabel('Power [arb. uni.]')
     
+    p = np.polyfit(v, s_phase,1, w = np.abs(s)**2)
+    zeroedPhase = s_phase - np.polyval(p,v)
     
     # Spectrum (Intensity + Phase)
     figF = plt.figure()
     axFl = figF.gca()
     axFr = axFl.twinx()
     axFl.plot(v/1e12, np.abs(s)**2, 'b')
-    axFr.plot(v/1e12, s_phase, 'r')
+    axFr.plot(v[np.abs(s)**2 > np.max(np.abs(s)**2)*0.1]/1e12, zeroedPhase[np.abs(s)**2 > np.max(np.abs(s)**2)*0.1], 'r')
     axFl.set_xlim((v0-3*bandwidth)/1e12, (v0 + 3*bandwidth)/1e12)
     axFl.set_xlabel('Frequency [THz]')
-    axFl.set_ylabel('Intensity [arb. uni.]', color = 'blue')
-    axFr.set_ylim(np.min(s_phase[ ( np.abs(v-v0) < 3*bandwidth)  ]),np.max(s_phase[ ( np.abs(v-v0) < 3*bandwidth)  ]) )
+    axFl.set_ylabel('Power spectral density [arb. uni.]', color = 'blue')
     axFr.set_ylabel('Spectral phase [rad]', color = 'red')
     
     
@@ -258,9 +266,8 @@ def TwoDSI():
     axTl = figT.gca()
     axTr = axTl.twinx()
     axTl.plot(t2*1e15,np.abs(E2)**2,'b')
-    axTr.plot(t2[1:-1]*1e15, w_inst/(2*pi)/1e12 ,'r')
+    axTr.plot(t_inst[np.abs(E2[1:-1])**2 > np.max(np.abs(E2[1:-1])**2)*0.1]*1e15, w_inst[np.abs(E2[1:-1])**2 > np.max(np.abs(E2[1:-1])**2)*0.1]/(2*pi)/1e12 ,'r')
     #axTl.set_xlim(-2*tau2*1e15,2*tau2*1e15)
-    axTr.set_ylim((v0-2*bandwidth)/1e12, (v0+2*bandwidth)/1e12)
     axTl.set_xlabel('Time [fs]')
     axTl.set_ylabel('Intensity [arb. uni.]', color = 'blue')
     axTr.set_ylabel(r'$\nu_{inst}$ [THz]', color = 'red')
@@ -289,7 +296,7 @@ def TwoDSI():
     
     for  ii, tau_cw in enumerate(tau_cw_vec):
         
-        print(str(ii+1)+'/'+str(tau_cw_vec.shape[0]))
+        print(str(ii+1)+'/'+str(traceNumberDataPoints + shearNumberDataPoints))
     
         E_short = np.interp(t,t+tau_sfg,E)
         
@@ -302,7 +309,7 @@ def TwoDSI():
         Esq = E_short*E_omega + E_short*E_cw
         
         
-        nu, Esqnu = fq.ezfft(t,Esq)
+        nu, Esqnu = fq.ezfft(t,Esq,neg = False)
         
         lamb = C/nu
         
@@ -310,9 +317,9 @@ def TwoDSI():
         lamb = lamb[II]
         Esqlamb = Esqnu[II]
         
-        trace[ii,:] = np.interp(xSpectro, lamb, np.abs(Esqlamb)**2) + np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
+        trace[ii,:] = np.interp(xSpectro, lamb, np.abs(Esqlamb)**2) 
         
-    trace = trace / np.max(trace)
+    trace = trace / np.max(trace) + np.random.normal(scale = noiseLevel, size = trace.shape)
     
     tau_cw_vec = np.linspace(stageShearScanMinMax[0],stageShearScanMinMax[1],shearNumberDataPoints) / C * 2
     
@@ -321,6 +328,7 @@ def TwoDSI():
     
     for  ii, tau_cw in enumerate(tau_cw_vec):
         
+        print(str(ii+1+traceNumberDataPoints)+'/'+str(traceNumberDataPoints + shearNumberDataPoints))
         
         E_short = np.interp(t,t+tau_sfg,E)
         
@@ -333,7 +341,7 @@ def TwoDSI():
         Esq = E_short*E_cw
         
         
-        nu, Esqnu = fq.ezfft(t,Esq)
+        nu, Esqnu = fq.ezfft(t,Esq,neg = False)
         
         lamb = C/nu
         
@@ -341,13 +349,20 @@ def TwoDSI():
         lamb = lamb[II]
         Esqlamb = Esqnu[II]
         
-        shearSpectra[ii,:] = np.interp(xSpectro, lamb, np.abs(Esqlamb)**2)+ np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
-    shearSpectra = shearSpectra/np.max(shearSpectra)
+        shearSpectra[ii,:] = np.interp(xSpectro, lamb, np.abs(Esqlamb)**2*C/lamb**2)
+        
+        
+    shearSpectra = shearSpectra/np.max(shearSpectra) + np.random.normal(scale = noiseLevel, size = shearSpectra.shape)
     
-    upconvSpectrum =np.interp(xSpectro,lamb, np.abs( fq.ezfft(t, E_short*E_omega )[1][II] )**2)+ np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
+    tmp = np.abs( fq.ezfft(t, E_short*E_omega,neg = False )[1][II] )**2*C/lamb**2
+    tmp /= tmp.max()
+    upconvSpectrum =np.interp(xSpectro,lamb, tmp)+ np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
     
     for ii in range(averageUpconvSpectrum-1):
-        upconvSpectrum += np.interp(xSpectro,lamb, np.abs( fq.ezfft(t, E_short*E_omega )[1][II] )**2)+ np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
+        
+        tmp = np.abs( fq.ezfft(t, E_short*E_omega,neg = False )[1][II] )**2*C/lamb**2
+        tmp /= tmp.max()
+        upconvSpectrum += np.interp(xSpectro,lamb, tmp)+ np.random.normal(scale = noiseLevel, size = xSpectro.shape[0])
     
     upconvSpectrum /= averageUpconvSpectrum
     
@@ -360,12 +375,12 @@ def TwoDSI():
     
     
     plt.figure()
-    plt.pcolor(xSpectro*1e9,zTrace,trace)
+    plt.pcolormesh(xSpectro*1e9,zTrace,trace,shading='auto')
     
     
     
     plt.figure()
-    plt.pcolor(xSpectro*1e9,zShear,shearSpectra)
+    plt.pcolormesh(xSpectro*1e9,zShear,shearSpectra,shading='auto')
     
     
     
@@ -374,24 +389,32 @@ def TwoDSI():
     plt.figure()
     plt.plot(xSpectro*1e9,upconvSpectrum)
     
+    tmp = np.abs( fq.ezfft(t, E,neg = False )[1][II] )**2*C/lamb**2
+    tmp /= tmp.max()
+    fundSpectrum =np.interp(xSpectroFund,lamb, tmp)+ np.random.normal(scale = noiseLevel, size = xSpectroFund.shape[0])
+    
+    #fundSpectrum = fq.ezsmooth(fundSpectrum)
+    #fundSpectrum[fundSpectrum<fundSpectrum.max()/100] = 0
     
     
     
-    np.savez('sim2dsiData', wavelengths = xSpectro*1e9, shearStagePosition = zShear, twoDSIStagePosition = zTrace,  upconvSpectrum = upconvSpectrum, shearTrace = shearSpectra, twoDSITrace = trace, timeVector = t, inputPulse = np.abs(E)**2/ np.max(np.abs(E)**2))
+    np.savez('simulated2dsiData', wavelengths = xSpectro*1e9, shearStagePosition = zShear, twoDSIStagePosition = zTrace,  upconvSpectrum = upconvSpectrum, shearTrace = shearSpectra, twoDSITrace = trace, timeVector = t, inputPulse = E / np.abs(E).max())
+    np.savez('simulated2dsiFundSpectrum', wavelengths = xSpectroFund*1e9, spectrum = fundSpectrum)
+    
 
     return
 
 
 def FROG():
     
-    pulse = fq.Pulse(800e-9,5e-15,T=1000e-15,dt = 0.05e-15)
-    pulse = pulse.disperse(dispVec=[-25,-50,500,2000])
+    pulse = fq.Pulse(800e-9,10e-15,T=1000e-15,dt = 0.1e-15)
+    pulse = pulse.disperse(dispVec=[100,-1000])
     
     v0 = C/800e-9
     
-    v, s = fq.ezfft(pulse.t,pulse.E,neg = True)
+    v, s = fq.ezfft(pulse.t,pulse.E)
     
-    s *= 0.2*(v-v0)/v0 -0.3*(v-v0)**2/v0**2
+    #s *= np.exp( 1j* np.exp( -2*(v-365e12)**2/2e12**2 )*np.pi/2 )
     
     pulse.t,pulse.E = fq.ezifft(v,s)
     
@@ -399,24 +422,30 @@ def FROG():
     
     
     
-    delays = np.linspace(-70e-15,70e-15,512)
-    spectroX = np.linspace(300e-9,600e-9,512)
+    delays = np.linspace(-200e-15,200e-15,512)
+    spectroX = np.linspace(300e-9,500e-9,256)
+    spectroFundX = np.linspace(500e-9,1200e-9,1024)
     
-    noise_level = 0.1
+    noise_level = 0.0
     
     trace = np.zeros((len(delays),len(spectroX)))
     
     for ii,delay in enumerate(delays):
     
+        print(str(ii+1)+'/'+str(delays.shape[0]))
+    
         delayedField = interp(pulse.t+delay,pulse.E,'quadratic',bounds_error=False,fill_value=0)
         pulse2 = fq.Pulse(t=pulse.t,E=delayedField(pulse.t))
         
-        vtmp, shgV = fq.ezfft(pulse.t,pulse.E*pulse2.E)
+        vtmp, shgV = fq.ezfft(pulse.t,pulse.E*pulse2.E,neg = False)
     
         shgV = np.abs(shgV)**2
-        interpSHG = interp(C/vtmp[-1::-1],shgV[-1::-1],'quadratic',bounds_error=False,fill_value=0)
         
-        trace[ii,:] = interpSHG(spectroX)
+        shgV *= np.sinc(((vtmp-(2*v0))/(v0))*np.pi)**2
+        
+        interpSHG = interp(C/vtmp[-1::-1],shgV[-1::-1]* vtmp[-1::-1]**2 / C,'quadratic',bounds_error=False,fill_value=0)
+        
+        trace[ii,:] = interpSHG(spectroX) 
         
     trace /= np.max(trace)
     trace += np.random.normal(0,noise_level,trace.shape)
@@ -431,19 +460,31 @@ def FROG():
     v, s = fq.ezfft(pulse.t,pulse.E)
     
     plt.figure()
-    plt.plot(C/v*1e9,np.abs(s)**2 / np.max(np.abs(s)**2))
+    plt.plot(C/v[v>0]*1e9,np.abs(s[v>0])**2 / np.max(np.abs(s[v>0])**2))
     plt.xlabel('Wavelength [nm]')
     plt.xlim(spectroX[0]*2e9,spectroX[-1]*2e9)
     plt.ylabel('Normalized power density')
     
     plt.figure()
-    plt.pcolor(spectroX*1e9,delays*1e15,trace)
-    plt.xlabel('Wavelength [nm]')
-    plt.ylabel('Delay [fs]')
+    plt.pcolormesh(delays*1e15,spectroX*1e9,trace.T,shading='auto')
+    plt.ylabel('Wavelength [nm]')
+    plt.xlabel('Delay [fs]')
     c = plt.colorbar()
     c.set_label('Normalized power density')
     
+    fundSpectrum =interp(C/v[v>0][-1::-1],np.abs(s[v>0][-1::-1])**2*v[v>0][-1::-1]**2/C,'quadratic',bounds_error=False,fill_value=0)(spectroFundX)
+    fundSpectrum /= fundSpectrum.max()
+    fundSpectrum +=  np.random.normal(0,noise_level,fundSpectrum.shape)
+    
+# =============================================================================
+#     fundSpectrum = fq.ezsmooth(fundSpectrum)
+#     fundSpectrum[fundSpectrum<fundSpectrum.max()/100] = 0
+# =============================================================================
+    
+    
     np.savez('simFROGData.npz',time = delays*1e15, wavelengths = spectroX*1e9, trace = trace)
+    np.savez('simFROGSpectrum.npz', wavelengths = spectroFundX*1e9, spectrum = fundSpectrum)
+    
     
     return
 

@@ -29,26 +29,8 @@ def freq2time(frequency, amplitude_spectrum):
     return t, amplitude_time
 
 
-def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoothSpectrum = False, zeroPadTrace = True, windowTrace = True, minTimeResolution = 1e-15, folder = '', spectrum = None):
-
-    #%% Analysis parameters
-    debug = False                # Setting True will output many more figures for debugging
-    simulatedData = False        # Setting to True will load last set of simulated data rather than experimental data
-    fitPolynomialToPhase = False # Setting to an integer value >1 will fit a polynomial of same order to the phase curve in w space
-    simulateFrogTrace = False    # Simulate a Frog trace with final result
+def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoothSpectrum = False, zeroPadTrace = True, windowTrace = True, minTimeResolution = 1e-15, folder = '', spectrum = None,relativeNoiseFloor = 0.01,simulatedData = False,debug = False):
     
-    
-    
-    
-    """ If file contains data acquired over a long distance on the stage, with a shear
-        that changes a lot from start to end, set a value here to window the trace
-        around the point where the shear is equal to that value """
-    manualShear = None
-    
-    
-    """ Range of stage displacement over which to window the trace. 
-        Set to None to keep full data. """
-    zWindowLength = None
     
     data = np.load(folder+filename)
     fixedMirrorData = data['upconvSpectrum']
@@ -60,7 +42,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     #%% Load data
     if simulatedData:
-        tdsiTrace = data['twoDSITrace']
+        #tdsiTrace = data['twoDSITrace']
         timeVector = data['timeVector']
         inputPulse = data['inputPulse']
     
@@ -87,7 +69,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     
     #%% Substract noise floor from data. Taken as max value of either the first or
     #   the last datapoint of the spectrum. Any negative value is afterward set to 0.
-    fixedMirrorData, movingMirrorData = library_2dsi.substractNoiseFloor(fixedMirrorData, movingMirrorData)
+    fixedMirrorData, movingMirrorData = library_2dsi.substractNoiseFloor(fixedMirrorData, movingMirrorData,relativeNoiseFloor)
     
     """ Add trace postprocessing here. Mostly consists of interpolating trace to a linear
         grid along stage displacement axis. Will be added once the 2dsi control software
@@ -125,11 +107,11 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
         fundWavelengths = data2['wavelengths']*1e-9
         data2.close()
         if upconvWavelength == 'auto':
-            upconvWavelength = library_2dsi.find_upconversion(wavelengths, upconvPowerSpectrum, fundWavelengths, fundPowerSpectrum)
+            upconvWavelength,downConvWavelengths, downConvSpectrum = library_2dsi.find_upconversion(wavelengths, upconvPowerSpectrum, fundWavelengths, fundPowerSpectrum)
             print('Upconversion wavelength: ' + str(round(upconvWavelength*1e9)) + ' nm')
         plt.figure()
         plt.plot(fundWavelengths*1e9,fundPowerSpectrum/fundPowerSpectrum.max(), label = 'Fundamental spectrum')
-        plt.plot(1/(1/wavelengths-1/upconvWavelength)*1e9, upconvPowerSpectrum/upconvPowerSpectrum.max(),'--r', label = 'Un-upconverted spectrum')
+        plt.plot(downConvWavelengths*1e9, downConvSpectrum/downConvSpectrum.max(),'--r', label = 'Un-upconverted spectrum')
         plt.ylim([0,1.05])
         plt.xlabel('Wavelengths [nm]')
         plt.ylabel('Normalized power density')
@@ -141,45 +123,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
         upconvWavelength = wavelengths[np.argmax(upconvPowerSpectrum)]*2
         print('Upconversion wavelength: ' + str(round(upconvWavelength*1e9)) + ' nm')
         
-        
-    #%% Smooth spectrum, if desired
-    # =============================================================================
-    # if smoothingSpectrum:
-    #     upconvPowerSpectrum = fq.ezsmooth(upconvPowerSpectrum, window_len = 7, window = 'flat')
-    #     for ii in range(movingMirrorData.shape[0]):
-    #         movingMirrorData[ii,:] = fq.ezsmooth(movingMirrorData[ii,:], window_len = 7, window = 'flat')
-    # 
-    # =============================================================================
-    #%% Define linear space of stage displacement
-    
-    #%% Set trace windowing parameters
-    if manualShear is not None:
-    
-        # Make a map of shear vs stage position
-        shearMap = library_2dsi.make_shear_map(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,debug)
-        
-        # Make a linear fit
-        p = np.polyfit(shearMap, movingMirrorZ,1)
-        
-        # Find position of desired shear
-        z0 = np.polyval(p, manualShear)
-        
-        # Set center of window  to center of data if desired shear can't be obtained
-        if (z0 > zMax) or (z0 < zMin):
-            z0 = (zMax + zMin)/2
-    else:
-        z0 = (zMin+zMax)/2
-    
-    
-    #%% Window the trace, if desired
-    if zWindowLength is not None:
-        zMin = z0 - zWindowLength/2
-        zMax = z0 + zWindowLength/2
-        tdsiTrace = tdsiTrace[((tdsiTraceZ>=zMin) & (tdsiTraceZ<=zMax)),:]
-        tdsiTraceZ = tdsiTraceZ[((tdsiTraceZ>=zMin) & (tdsiTraceZ<=zMax))]
-        movingMirrorData = movingMirrorData[((movingMirrorZ>=zMin) & (movingMirrorZ<=zMax)),:]
-        movingMirrorZ = movingMirrorZ[((movingMirrorZ>=zMin) & (movingMirrorZ<=zMax))]
-    
+  
     
     """ Find mean shear of data """ 
     shearFrequency = library_2dsi.find_shear(wavelengths, upconvPowerSpectrum, movingMirrorData,movingMirrorZ,tdsiTraceZ,debug)
@@ -200,7 +144,7 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     """ Calculate spectral phase from FFT. Currently only using concatenation algorithm.
         Also outputs GDD and TOD (this calculation wil be moved to a new function 
         once other algorithms will be implemented """ 
-    concW, concPhase,concGD, concGDD, concTOD, midpointW, midpointPhase,midpointGD, midpointGDD, midpointTOD = library_2dsi.calc_spectral_phase(shearFrequency, upconvWavelength,FFTamplitude, FFTphase, FFTwavelengths,polyfit = fitPolynomialToPhase,debugGraphs = debug)
+    concW, concPhase, midpointW, midpointPhase = library_2dsi.calc_spectral_phase(shearFrequency, upconvWavelength,FFTamplitude, FFTphase, FFTwavelengths,debugGraphs = debug)
     
     """ Calculate temporal enveloppe of pulse from upconverted power spectrum and
         spectral phase calculated above. Function directly outputs the square of 
@@ -211,99 +155,78 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     """ Calculate temporal enveloppe of Fourier-limited pulse """
     tLim, pulseLim, Elim = library_2dsi.calc_temporal_envelope(wavelengths, upconvPowerSpectrum, upconvWavelength, concW, np.zeros_like(concW), False,minTimeResolution)
     
+    tInterp = np.linspace(tLim[1],tLim[-2],1000000)
+    pulseConcInterp = interp(tConc,pulseConc,'quadratic',bounds_error = False,fill_value = 0)(tInterp)
+    pulseMidpointInterp = interp(tMidpoint,pulseMidpoint,'quadratic',bounds_error = False,fill_value = 0)(tInterp)
+    pulseLimInterp = interp(tLim,pulseLim,'quadratic',bounds_error = False,fill_value = 0)(tInterp)
+    
     """ Realign pulse's peak intensity to t = 0 fs """
-    tpeak = tConc[ np.argmax(pulseConc)]
-    pulseConc = np.interp(tConc, tConc-tpeak, pulseConc)
-    Econc = np.interp(tConc, tConc-tpeak, Econc)
+    tpeakConc = tInterp[ np.argmax(pulseConcInterp)]
     
-    tpeak = tMidpoint[ np.argmax(pulseMidpoint)]
-    pulseMidpoint = np.interp(tMidpoint, tMidpoint-tpeak, pulseMidpoint)
+    tpeakMidpoint = tInterp[ np.argmax(pulseMidpointInterp)]
     
-    tpeak = tLim[ np.argmax(pulseLim)]
-    pulseLim = np.interp(tLim, tLim-tpeak, pulseLim)
+    tpeakLim = tInterp[ np.argmax(pulseLimInterp)]
     
     if simulatedData:
-        tpeak = timeVector[ np.argmax(inputPulse)]
-        inputPulse = np.interp(timeVector, timeVector-tpeak, inputPulse)
+        T = timeVector[-1] - timeVector[0]
+        vIn, sIn = fq.ezfft(timeVector, inputPulse)
+        phaseIn = np.unwrap(np.angle(sIn* np.exp(1j*2*np.pi*vIn*(T/2) ))) 
+        p = np.polyfit(vIn, phaseIn,1, w = np.abs(sIn)**2)
+        phaseIn -= np.polyval(p, vIn)
     
+        pulseInInterp = interp(timeVector,np.abs(inputPulse)**2,'quadratic',bounds_error = False,fill_value = 0)(tInterp)
+        tpeakIn = tInterp[ np.argmax(pulseInInterp)]
+        inputPulse = interp(timeVector-tpeakIn, inputPulse,'quadratic',bounds_error = False,fill_value = 0)(timeVector)
+        
+        
+        
     """ Make figures and output values in console. Will be cleaned up in next update """
     fig = plt.figure()
     ax = fig.gca()
-    ax.plot(tConc*1e15, pulseConc/np.max(pulseConc), '--b', label = 'Concat.')
-    ax.plot(tMidpoint*1e15, pulseMidpoint/np.max(pulseMidpoint), '--r', label = 'Midpoint')
-    ax.plot(tLim*1e15, pulseLim/np.max(pulseLim), 'k', label = 'Fourier lim.')
+    ax.plot((tConc-tpeakConc)*1e15, pulseConc/np.max(pulseConc), '--b', linewidth =3 , label = 'Concat.')
+    ax.plot((tMidpoint-tpeakMidpoint)*1e15, pulseMidpoint/np.max(pulseMidpoint), '--r', linewidth =3, label = 'Midpoint')
+    ax.plot((tLim-tpeakLim)*1e15, pulseLim/np.max(pulseLim), 'k', linewidth =3, label = 'Fourier-lim.')
     ax.set_ylim([0,1.05])
     ax.set_xlabel('Time [fs]')
-    ax.set_ylabel('Normalised intensity')
+    ax.set_ylabel('Normalised power')
     if simulatedData:
-        ax.plot(timeVector*1e15, inputPulse, '-.g', label = 'Sim. input')
-        ax.set_ylim([0,1.05])
+        ax.plot(timeVector*1e15, np.abs(inputPulse)**2 / np.max( np.abs(inputPulse)**2), '-.g', label = 'Input')
     ax.legend()
     ax.set_xlim([-150, 150])
     
-# =============================================================================
-#     fig = plt.figure()
-#     ax = fig.gca()
-#     ax.plot(tLim*1e15, pulseLim/np.max(pulseLim), 'k', label = 'Fourier limited')
-#     ax.plot(tConc*1e15, pulseConc/np.max(pulseConc), '--r', label = 'Reconstructed')
-#     ax.set_xlabel('Time [fs]')
-#     ax.set_ylabel('Normalised intensity')
-#     ax.legend()
-#     ax.set_xlim([-150, 150])
-# =============================================================================
     
     
-    fig = plt.figure()
-    axLeft = fig.gca()
-    IIphase = np.argsort(concW,axis=None)
-    IIGDD = np.argsort(concW[:,1:-1],axis=None)
-    IITOD = np.argsort(concW[:,2:-2],axis=None)
-    lambdaPhase = np.flip( 2*np.pi*2.998e8/concW.flatten()[IIphase]*1e9 )
-    lambdaGDD = np.flip( 2*np.pi*2.998e8/concW[:,1:-1].flatten()[IIGDD]*1e9 )
-    lambdaTOD = np.flip( 2*np.pi*2.998e8/concW[:,2:-2].flatten()[IITOD]*1e9 )
-    concPhase =  np.flip( concPhase.flatten()[IIphase] )
-    concGD =  np.flip( concGD.flatten()[IIGDD]*1e15 )
-    concGDD =  np.flip( concGDD.flatten()[IIGDD]*1e30 )
-    concTOD =  np.flip( concTOD.flatten()[IITOD]*1e45 )
-    
-    IIplot = upconvPowerSpectrum > np.max(upconvPowerSpectrum)/20
-    wav1 = (1 / (1/wavelengths - 1/upconvWavelength)*1e9)[IIplot][0]
-    wav2 = (1 / (1/wavelengths - 1/upconvWavelength)*1e9)[IIplot][-1]
-    IIGDD = ((lambdaGDD>=wav1) & (lambdaGDD<=wav2))
-    IIphase = ((lambdaPhase>=wav1) & (lambdaPhase<=wav2))
-    w1 = 2*np.pi*2.998e8/wav2*1e9
-    w2 = 2*np.pi*2.998e8/wav1*1e9
+    vp, sp = fq.ezfft(tConc,Econc)
+    T = tConc[-1]-tConc[0]
+    phaseC = np.unwrap(np.angle(sp* np.exp(1j*2*np.pi*vp*(T/2) ))) 
+    p = np.polyfit(vp, phaseC,1, w = np.abs(sp)**2)
+    phaseC -= np.polyval(p, vp)
+
+    vm, sm = fq.ezfft(tMidpoint,Emidpoint)
+    T = tMidpoint[-1]-tMidpoint[0]
+    phaseM = np.unwrap(np.angle(sm* np.exp(1j*2*np.pi*vm*(T/2) ))) 
+    p = np.polyfit(vm, phaseM,1, w = np.abs(sm)**2)
+    phaseM -= np.polyval(p, vm)
     
     
-    axLeft.plot(1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum/np.max(upconvPowerSpectrum), '-b', linewidth = 2)
-    axLeft.set_ylim([0,1.05])
-    axRight = axLeft.twinx()
-    axRight.plot(lambdaGDD[IIGDD], concGD[IIGDD], '--r', linewidth = 2, label = 'Concat.')
-    axRight.plot(2*np.pi*2.998e8/midpointW[1:-1][((midpointW[1:-1]>w1) & (midpointW[1:-1]<w2))]*1e9, midpointGD[((midpointW[1:-1]>w1) & (midpointW[1:-1]<w2))]*1e15, '--k', linewidth = 2, label = 'Midpoint')
-    axLeft.set_xlabel('Wavelength [nm]')
-    axLeft.set_ylabel('Normalized intensity')
-    axRight.set_ylabel(r'Group delay [fs]')
+    plt.figure()
+    axLeft = plt.gca()
+    axLeft.plot(vp[vp>0]/1e12, np.abs(sp[vp>0])**2 / np.max(np.abs(sp[vp>0])**2) , '-k', linewidth = 3)
+    axRight = plt.twinx()
+    axRight.plot(vp[ np.abs(sp)**2 > (np.abs(sp)**2).max()/20 ]/1e12, phaseC[ np.abs(sp)**2 > (np.abs(sp)**2).max()/20 ], '--b', linewidth = 3, label = 'Concatenation')
+    axRight.plot(vm[ np.abs(sm)**2 > (np.abs(sm)**2).max()/20 ]/1e12, phaseM[ np.abs(sm)**2 > (np.abs(sm)**2).max()/20 ], '--r', linewidth = 3, label = 'Midpoint')
+    if simulatedData:
+        axLeft.plot(vIn[vIn>0]/1e12, np.abs(sIn[vIn>0])**2 / np.max(np.abs(sIn[vIn>0])**2) , '-g', linewidth = 2)
+        axRight.plot(vIn[ np.abs(sIn)**2 > (np.abs(sIn)**2).max()/20 ]/1e12, phaseIn[ np.abs(sIn)**2 > (np.abs(sIn)**2).max()/20 ], '--g', linewidth = 2, label = 'Input')
+    axLeft.set_xlim(C/(1 / (1/wavelengths - 1/upconvWavelength))[-1]/1e12,C/(1 / (1/wavelengths - 1/upconvWavelength))[0]/1e12)
+    axLeft.set_xlabel('Frequency [Thz]')
+    axLeft.set_ylabel('Power spectral density [arb. u.]')
+    axRight.set_ylabel('Spectral phase [rad]')
     axRight.legend()
-    
-    fig2 = plt.figure()
-    axLeft2 = fig2.gca()
-    axLeft2.plot(1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum / np.max(upconvPowerSpectrum), '-b', linewidth = 2)
-    axLeft2.set_ylim([0,1.05])
-    axRight2 = axLeft2.twinx()
-    axRight2.plot(lambdaPhase[IIphase], concPhase[IIphase], '--r', linewidth = 2)
-    axLeft2.set_xlabel('Wavelength [nm]')
-    axLeft2.set_ylabel('Normalized power spectrum')
-    axRight2.set_ylabel(r'Spectral phase [rad]')
-    axLeft2.yaxis.label.set_color('blue')
-    axRight2.yaxis.label.set_color('red')
-    axRight2.set_ylim(-np.pi,np.pi)
-    
-    weightsGDD = np.interp( lambdaGDD, 1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum )
-    averageGDD = np.average(concGDD, weights =  weightsGDD)
-    weightsTOD = np.interp( lambdaTOD, 1 / (1/wavelengths - 1/upconvWavelength)*1e9, upconvPowerSpectrum )
-    averageTOD = np.average(concTOD, weights =  weightsTOD)
+    axLeft.set_ylim([0,1.05])
     
     
+    print("Shear frequency: " + str(round(shearFrequency/1e12,1)) +" THz")
     
     
     
@@ -317,22 +240,22 @@ def twodsi(filename,  upconvWavelength = 'auto', wavelengthCutoffs = None, smoot
     else:
         print( "Midpoint pulse duration: " + str(round(fq.ezfindwidth(tMidpoint, pulseMidpoint)*1e15*100)/100) +" fs" )
         
-    print( "F. lim. pulse duration: " + str(round(fq.ezfindwidth(tLim, pulseLim)*1e15*100)/100) +" fs")
-    print('Average GDD (conc.): ' + str(round(averageGDD*100)/100) + ' fs sq.') 
-    print('Average TOD (conc.): ' + str(round(averageTOD*100)/100) + ' fs cu.') 
+    print( "Fourier-lim. pulse duration: " + str(round(fq.ezfindwidth(tLim, pulseLim)*1e15*100)/100) +" fs")
+
+    if simulatedData:
+        print( "Input pulse duration: " + str(round(fq.ezfindwidth(timeVector, np.abs(inputPulse)**2)*1e15*100)/100) +" fs")
     
-    print('Shear frequency:' + str(round(shearFrequency/1e12 * 100)/100) + ' THz')
-    
-    if simulateFrogTrace:
-        library_2dsi.simFrogTrace(tConc,Econc,minWavelength,maxWavelength)
-    
-    plt.show()
-    
-    return lambdaPhase, concPhase, tConc, Econc
+    return tConc, Econc, Emidpoint
     
     
-def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
+def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, smoothTrace = True, relativeNoiseTreshold = 0, marginalCorrection = None):
     
+    """
+    Uses pypret retrieval module developped by Nils C. Geib at the Institute of Applied Physics of the University of Jena, Germany.
+    It is available at https://github.com/ncgeib/pypret, and is licenced under the MIT License (see LICENSE file in the module).
+    
+    
+    """
     
     delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits)
 
@@ -341,8 +264,12 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     t_0 = delays[np.argmax(marginal_t)]
     delays -= t_0
     
+    if smoothTrace:
+        for ii, delay in enumerate(delays):
+            trace[ii,:] = fq.ezsmooth(trace[ii,:])
+    
     """ Removing negative values from trace. Seems to give slightly better results"""
-    trace[trace<0] = 0
+    trace[trace<trace.max()*relativeNoiseTreshold] = 0
     
     """ PCGPA algorithm requires a symmetric grid """
     if method.lower() == 'pcgpa':
@@ -398,19 +325,20 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         data = np.load(marginalCorrection)
         corrWavelengths = data['wavelengths']*1e-9
         corrSpectrum = data['spectrum']
+        data.close()
         
         corrSpectrumRaw = np.copy(corrSpectrum)
         
         corrW = np.linspace(-4*np.pi*C/corrWavelengths[0],4*np.pi*C/corrWavelengths[0],4*len(corrWavelengths)+1)
         
-        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1] ,bounds_error=False,fill_value=0)(corrW)
+        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1]*corrWavelengths[-1::-1]**2/C ,bounds_error=False,fill_value=0)(corrW)
         
         x,y = fq.ezifft(corrW,corrSpectrum)
         absc_conv,autoConv = fq.ezfft(x,y**2,neg = True) 
         autoConv = np.real(autoConv)
 
         
-        autoConv = interp(absc_conv, autoConv,bounds_error=False,fill_value=0)(2*np.pi*C/wavelengths)
+        autoConv = interp(absc_conv, autoConv*absc_conv**2/C,bounds_error=False,fill_value=0)(2*np.pi*C/wavelengths)
         
         marginal_w_corr = np.copy(marginal_w)
         marginal_w_corr[marginal_w_corr<=0] = marginal_w_corr[marginal_w_corr>0].min()
@@ -455,14 +383,14 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     for ii,delay in enumerate(delays):  
     
         interpTrace = interp(C/wavelengths[-1::-1],trace[ii,:][-1::-1],'quadratic',bounds_error=False,fill_value=0)
-        trace_w[ii,:] = interpTrace(w_shg/2/np.pi)
+        trace_w[ii,:] = interpTrace(w_shg/2/np.pi) * C/(w_shg/2/np.pi)**2
         
         
     
     
     """ Plot interpolated trace (to check interpolation errors) """
     plt.figure()
-    plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg)*1e9,trace_w.transpose())
+    plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg[w_shg>0])*1e9,trace_w[:,w_shg>0].transpose() / (trace_w[:,w_shg>0].transpose()).max() ,shading='auto')
     if marginalCorrection is None:
         plt.title('Input trace (interpolated)')
     else:
@@ -501,7 +429,7 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
         initialGuess = np.complex128(np.exp(- (w_fund-w_0)**2 / dw**2)) * np.exp(1j*GDD*(w_fund-w_0)**2)
     
     elif (initialGuess.lower()=='spectrum') & (marginalCorrection is not None):
-       initialGuess = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrumRaw[-1::-1] ,bounds_error=False, fill_value=0)(w_fund)
+       initialGuess = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrumRaw[-1::-1]*corrWavelengths[-1::-1]**2/C  ,bounds_error=False, fill_value=0)(w_fund)
        initialGuess[initialGuess<0]=0
        initialGuess = np.complex128(initialGuess**0.5)
        initialGuess /= initialGuess.max()
@@ -527,7 +455,10 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     axSpectrum = library_frog.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
     
     if marginalCorrection is not None:
-        axSpectrum.plot(corrWavelengths*1e9,corrSpectrumRaw/corrSpectrumRaw.max(),'g--',linewidth = 3,label = 'Measured')
+        refSpectrum = corrSpectrumRaw * corrWavelengths**2/C
+        refSpectrum /= refSpectrum.max()
+        refSpectrum = np.interp(pulseFrequencies[pulseFrequencies>0], C/corrWavelengths[-1::-1],refSpectrum[-1::-1])
+        axSpectrum.plot(pulseFrequencies[pulseFrequencies>0] / 1e12,refSpectrum,'g--',linewidth = 3,label = 'Measured')
         axSpectrum.set_ylim([0,1.05])
     axSpectrum.legend()
     
