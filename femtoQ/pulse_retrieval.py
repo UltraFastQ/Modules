@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from femtoQ.pr_backend import tdsilib as library_2dsi
 from femtoQ.pr_backend import froglib as library_frog
+from femtoQ.pr_backend import dscanlib as library_dscan
 from scipy.constants import c as C
 from scipy.interpolate import interp1d as interp
 from scipy.integrate import simps as simpson
