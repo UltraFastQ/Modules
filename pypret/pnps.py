@@ -321,6 +321,37 @@ class DSCAN(CollinearPNPS):
         raise NotImplementedError("Not implemented in public version of the "
                                   "code.")
 
+class DSCAN_femtoq(CollinearPNPS):
+    """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
+
+    Not implemented in the public version of the code. Please contact us
+    if you want to use pypret for d-scan measurements.
+    """
+    method = "dscan"
+    parameter_name = "insertion"
+    parameter_unit = "m"
+
+    def __init__(self, pulse, process, material):
+        """ Creates the instance.
+
+        Parameters
+        ----------
+        pulse : Pulse instance
+            The pulse object that defines the simulation grid.
+        process : str
+            The nonlinear process used in the PNPS method.
+        material : Function?
+            Return k(w) (Sellmeier equation for the material of choice)
+        """
+        super().__init__(pulse, process, material=material)
+
+
+    def mask(self, insertion):
+        w = self.ft.w + self.w0
+        return np.exp(1.0j * self.material(w) * insertion)
+
+
+
 
 # =============================================================================
 # Noncollinear PNPS methods
