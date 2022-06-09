@@ -307,19 +307,19 @@ class IFROG(CollinearPNPS):
         return 0.5 + 0.5 * np.exp(-1.0j * w * tau)
 
 
-class DSCAN(CollinearPNPS):
-    """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
+# class DSCAN(CollinearPNPS):
+#     """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
 
-    Not implemented in the public version of the code. Please contact us
-    if you want to use pypret for d-scan measurements.
-    """
-    method = "dscan"
-    parameter_name = "insertion"
-    parameter_unit = "m"
+#     Not implemented in the public version of the code. Please contact us
+#     if you want to use pypret for d-scan measurements.
+#     """
+#     method = "dscan"
+#     parameter_name = "insertion"
+#     parameter_unit = "m"
 
-    def __init__(self, pulse, process, material):
-        raise NotImplementedError("Not implemented in public version of the "
-                                  "code.")
+#     def __init__(self, pulse, process, material):
+#         raise NotImplementedError("Not implemented in public version of the "
+#                                   "code.")
 
 class DSCAN_femtoq(CollinearPNPS):
     """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
