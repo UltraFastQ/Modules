@@ -307,7 +307,7 @@ class IFROG(CollinearPNPS):
         return 0.5 + 0.5 * np.exp(-1.0j * w * tau)
 
 
-# class DSCAN(CollinearPNPS):
+# class DSCAN(CollinearPNPS):                                                               # This is N. Geib's DScan class
 #     """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
 
 #     Not implemented in the public version of the code. Please contact us
@@ -321,7 +321,7 @@ class IFROG(CollinearPNPS):
 #         raise NotImplementedError("Not implemented in public version of the "
 #                                   "code.")
 
-class DSCAN_femtoq(CollinearPNPS):
+class DSCAN(CollinearPNPS):                                                                 # This is our own DScan class
     """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
 
     Not implemented in the public version of the code. Please contact us
