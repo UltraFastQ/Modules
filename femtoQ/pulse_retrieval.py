@@ -473,7 +473,7 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths
 
 
-def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
+def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None, inputDelays = None, inputWavelengths = None, inputTrace = None, makeFigures = True):
     
     
     delays, wavelengths, trace = library_dscan.unpack_data(filename,wavelengthLimits)           # Here delay is actually insertion

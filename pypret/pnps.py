@@ -327,6 +327,7 @@ class DSCAN(CollinearPNPS):                                                     
     Not implemented in the public version of the code. Please contact us
     if you want to use pypret for d-scan measurements.
     """
+    _supported_processes = ["shg"]
     method = "dscan"
     parameter_name = "insertion"
     parameter_unit = "m"
