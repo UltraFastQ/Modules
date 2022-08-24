@@ -307,7 +307,7 @@ class IFROG(CollinearPNPS):
         return 0.5 + 0.5 * np.exp(-1.0j * w * tau)
 
 
-# class DSCAN(CollinearPNPS):
+# class DSCAN(CollinearPNPS):                                                               # This is N. Geib's DScan class
 #     """ Implements the dispersion scan method [Miranda2012a]_ [Miranda2012b]_.
 
 #     Not implemented in the public version of the code. Please contact us
@@ -331,7 +331,7 @@ class DSCAN_femtoq(CollinearPNPS):
     parameter_name = "insertion"
     parameter_unit = "m"
 
-    def __init__(self, pulse, process, material):
+    def __init__(self, pulse, process):
         """ Creates the instance.
 
         Parameters
@@ -343,13 +343,44 @@ class DSCAN_femtoq(CollinearPNPS):
         material : Function?
             Return k(w) (Sellmeier equation for the material of choice)
         """
-        super().__init__(pulse, process, material=material)
+        super().__init__(pulse, process)
+
+    def Sapphire(self,P_freq):
+        C=2.99792458e8
+        min_limit=C/(0.2e-6)
+        max_limit=C/(9e-6)
+        
+        index=np.argwhere( ((min_limit>=P_freq) & (P_freq>=max_limit)) )
+        #index2=np.argwhere(P_freq[index1]<=max_limit)
+        
+        n_sapph=np.ones(len(P_freq))
+        x=1e6*C/(P_freq[index])
+        n_sapph[index]=(1+1.4313493/(1-(0.0726631/x)**2)+0.65054713/(1-(0.1193242/x)**2)+5.3414021/(1-(18.028251/x)**2))**.5
+        
+        return n_sapph
+
+
+    def ZnSe(self,P_freq):
+        C=2.99792458e8
+        min_limit=C/(0.40e-6)
+        max_limit=C/(13.9e-6)
+        
+        index=np.argwhere( ((min_limit>=P_freq) & (P_freq>=max_limit)) )
+        #index2=np.argwhere(P_freq[index1]<=max_limit)
+        
+        n_znse=np.ones(len(P_freq))
+        x=1e6*C/(P_freq[index])
+        n_znse[index]=(1-0.689818+4.855169/(1-0.056359/x**2)+0.673922/(1-0.056336/x**2)+2.481890/(1-2222.114/x**2))**.5
+        
+        return n_znse
+
 
 
     def mask(self, insertion):
+        C=2.99792458e8
         w = self.ft.w + self.w0
-        return np.exp(1.0j * self.material(w) * insertion)
-
+        
+        return np.exp(-1.0j * 2 * np.pi * self.Sapphire(w/(2*np.pi))/(2*np.pi*C/w) * insertion*1e-3)
 
 
 

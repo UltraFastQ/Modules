@@ -473,115 +473,36 @@ def shgFROG(filename, initialGuess = 'gaussian', tau = None, method = 'copra', d
     return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths
 
 
-def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, symmetrizeGrid = False, wavelengthLimits = [0,np.inf], gridSize = None, marginalCorrection = None):
+def shgDscan(filename=None, initialGuess = 'Gaussian', tau = None, method = 'copra', dt = None , maxIter = 100, wavelengthLimits = [0,np.inf], inputDelays = None, inputWavelengths = None, inputTrace = None, makeFigures = True):
     
-    
-    delays, wavelengths, trace = library_dscan.unpack_data(filename,wavelengthLimits)           # Here delay is actually insertion
-                                                                                                # It was kept for simplicity's sake
-    # """ Recenter the trace to zero delay. Otherwise copra behaves weirdly"""
-    # marginal_t = simpson(trace,wavelengths,axis = 1)                                    # Removed because a dscan trace centered
-    # t_0 = delays[np.argmax(marginal_t)]                                                 # at 0 loses a lot of information
-    # delays -= t_0
+    if (inputDelays is not None) & (inputWavelengths is not None) & (inputTrace is not None):
+         delays = inputDelays
+         print('delays',delays)
+         wavelengths  = inputWavelengths
+         trace = inputTrace
+    else:
+         delays, wavelengths, trace = library_frog.unpack_data(filename,wavelengthLimits,makeFigures)           # Here delay is actually insertion
+                                                                                                                # It was kept for simplicity's sake
     
     """ Removing negative values from trace. Seems to give slightly better results"""
     trace[trace<0] = 0
     
-    """ PCGPA algorithm requires a symmetric grid """
-    if method.lower() == 'pcgpa':
-        symmetrizeGrid = True
-    
-    """ Adjust grid size if required """
-    if symmetrizeGrid:
-        if gridSize is None:
-            gridSize = [len(wavelengths),len(wavelengths)]
-        else:
-            gridSize[1] = gridSize[0]
-        
-    
-    
-    if dt is None:
-        dt = np.mean(np.diff(delays))
-        
-    if gridSize is not None:
-        
-        symTrace = np.zeros((gridSize[0],len(wavelengths)))
-        
-        delayLim = np.min([abs(delays[0]),abs(delays[-1])])
-        
-        # Symmetrize delay grid wrt frequency grid
-        symDelays = np.linspace(-delayLim,delayLim,gridSize[0])
-        
-        for ii, wavelength in enumerate(wavelengths):
-            interpTrace = interp(delays,trace[:,ii],'quadratic',bounds_error=False,fill_value=0)
-            symTrace[:,ii] = interpTrace(symDelays)
-            symTrace[:,ii] = 0.5*interpTrace(np.hstack((symDelays[symDelays<=0],symDelays[symDelays<0][-1::-1]))) + 0.5*interpTrace(np.hstack((symDelays[symDelays>=0][-1::-1],symDelays[symDelays>0])))
-            
-        trace = symTrace
-        delays = symDelays
-        dt = np.mean(np.diff(delays))
-    
     """ Define time/frequency grids for input pulse """
-    if gridSize is not None:
-        ft = pypret.FourierTransform(gridSize[1], dt = dt)
-    else:
-        ft = pypret.FourierTransform(len(delays), dt = dt)
+    dt = 40e-15 #min(wavelengths/(C))
+    ft = pypret.FourierTransform(len(wavelengths), dt = dt)
     
     """ Integrate over delay axis"""
     marginal_w = simpson(trace,delays,axis = 0)
-    
         
     """ Carrier wavelength """
     lambda_0 = C/(simpson(C/wavelengths[-1::-1]*marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)/simpson(marginal_w[-1::-1],C/wavelengths[-1::-1],axis = 0)) * 2
-    
-    """ Marginal correction: compare frequnecy marginal to spectrum autoconvolution.
-        Relative differences between the two should correspond to experimental
-        bandwidth limitation. Trace is adjusted accordingly to offset this effect. """
-    if marginalCorrection is not None:
-        data = np.load(marginalCorrection)
-        corrWavelengths = data['wavelengths']*1e-9
-        corrSpectrum = data['spectrum']
-        
-        corrSpectrumRaw = np.copy(corrSpectrum)
-        
-        corrW = np.linspace(-4*np.pi*C/corrWavelengths[0],4*np.pi*C/corrWavelengths[0],4*len(corrWavelengths)+1)
-        
-        corrSpectrum = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrum[-1::-1] ,bounds_error=False,fill_value=0)(corrW)
-        
-        x,y = fq.ezifft(corrW,corrSpectrum)
-        absc_conv,autoConv = fq.ezfft(x,y**2,neg = True) 
-        autoConv = np.real(autoConv)
-
-        
-        autoConv = interp(absc_conv, autoConv,bounds_error=False,fill_value=0)(2*np.pi*C/wavelengths)
-        
-        marginal_w_corr = np.copy(marginal_w)
-        marginal_w_corr[marginal_w_corr<=0] = marginal_w_corr[marginal_w_corr>0].min()
-        marginal_w_corr = fq.ezsmooth(marginal_w_corr,15,'hanning')
-        marginalCorr = ( autoConv/autoConv.max() ) / ( marginal_w_corr / marginal_w_corr.max() )
-
-        for ii, delay in enumerate(delays):
-            trace[ii,:]*=marginalCorr
-        
-        plt.figure()
-        plt.plot(wavelengths*1e9,autoConv/autoConv.max(),label = 'From spectrum')
-        plt.plot(wavelengths*1e9,marginal_w_corr / marginal_w_corr.max(), label = 'From FROG trace')
-        plt.xlabel('Wavelengths [nm]')
-        plt.ylabel('Frequency margianal')
-        plt.ylim([0,1.05])
-        plt.legend()
-        
-        plt.figure()
-        plt.plot(wavelengths*1e9,marginalCorr)
-        plt.xlabel('Wavelengths [nm]')
-        plt.ylabel('Marginal correction factor')
-        plt.ylim(bottom=0)
     
     """ Instantiate a pulse object w/ appropriate carrier wavelength
         (other parameters don't matter here)"""
     pulseP = pypret.Pulse(ft, lambda_0)
     pypret.random_gaussian(pulseP, 1e-15, phase_max=0.0)
         
-    """ Instantiate a PNPS object for SHG-FROG technique"""
+    """ Instantiate a PNPS object for SHG-DSCAN technique"""
     pnps = pypret.PNPS(pulseP, "dscan", "shg")
     pnps.calculate(pulseP.spectrum, delays)
     
@@ -589,29 +510,26 @@ def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', 
     w_shg = pnps.process_w
     w_fund = pulseP.w+pulseP.w0
 
-    
+    print(w_shg,w_fund)
     
     
     """ Interpolate trace to shg frequency grid """
     trace_w = np.zeros((len(delays),len(w_shg)))
     for ii,delay in enumerate(delays):  
     
-        interpTrace = interp(C/wavelengths[-1::-1],trace[ii,:][-1::-1],'quadratic',bounds_error=False,fill_value=0)
-        trace_w[ii,:] = interpTrace(w_shg/2/np.pi)
+        interpTrace = interp(C*2*np.pi/wavelengths[-1::-1],trace[ii,:][-1::-1],'quadratic',bounds_error=False,fill_value=0)
+        trace_w[ii,:] = interpTrace(w_shg)
         
         
     
     
     """ Plot interpolated trace (to check interpolation errors) """
     plt.figure()
-    plt.pcolormesh(delays*1e15,(2*np.pi*C/w_shg)*1e9,trace_w.transpose())
-    if marginalCorrection is None:
-        plt.title('Input trace (interpolated)')
-    else:
-        plt.title('Input trace (corrected + interpolated)')
-    plt.xlabel('Delay [fs]')
-    plt.ylabel('Wavelengths [nm]')
-    plt.ylim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
+    plt.pcolormesh((2*np.pi*C/w_shg)*1e9,delays,trace_w)
+    plt.title('Input trace (corrected + interpolated)')
+    plt.ylabel('Dispersion added [mm of Sapphire]')
+    plt.xlabel('Wavelengths [nm]')
+    plt.xlim(wavelengths[0]*1e9,wavelengths[-1]*1e9)
     plt.colorbar()
 
     """ Reformat trace for retriever """
@@ -624,29 +542,10 @@ def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', 
         RANA: Uses "RANA" algorithm to deduce the spectrum from the trace. Uses flat phase. Struggles w/ noise."""
         
     if initialGuess.lower() == 'gaussian':
-        if tau is None:
-            autocorr =  simpson(trace,wavelengths,axis = 1)
-            tau = library_dscan.get_FWHM(delays,autocorr)/np.sqrt(2) /np.sqrt(2*np.log(2))
-            
-            dw = library_dscan.get_FWHM(2*np.pi*C/wavelengths[-1::-1],marginal_w[-1::-1])/np.sqrt(2) /np.sqrt(2*np.log(2))
-            tau_0 = 2 / (dw)
-            
-            if tau > tau_0:
-                GDD = (tau**2*tau_0**2 - tau_0**4)**0.5/2
-            else:
-                GDD = 0
-        else:
-            dw = 2  / (tau/np.sqrt(2*np.log(2))) 
-            
+        dw = library_dscan.get_FWHM(2*np.pi*C/wavelengths[-1::-1],marginal_w[-1::-1])/np.sqrt(2) /np.sqrt(2*np.log(2))            
         
         w_0 = 2*np.pi*C/lambda_0
-        initialGuess = np.complex128(np.exp(- (w_fund-w_0)**2 / dw**2)) * np.exp(1j*GDD*(w_fund-w_0)**2)
-    
-    elif (initialGuess.lower()=='spectrum') & (marginalCorrection is not None):
-       initialGuess = interp( 2*np.pi*C/corrWavelengths[-1::-1], corrSpectrumRaw[-1::-1] ,bounds_error=False, fill_value=0)(w_fund)
-       initialGuess[initialGuess<0]=0
-       initialGuess = np.complex128(initialGuess**0.5)
-       initialGuess /= initialGuess.max()
+        initialGuess = np.complex128(np.exp(- (w_fund-w_0)**2 / (dw/2)**2))
     else:
         initialGuess = library_dscan.RANA(delays,w_shg,trace_w,w_fund)
     
@@ -667,10 +566,7 @@ def shgDscan(filename, initialGuess = 'gaussian', tau = None, method = 'copra', 
     
     """ Make plots """
     axSpectrum = library_dscan.plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths)
-    
-    if marginalCorrection is not None:
-        axSpectrum.plot(corrWavelengths*1e9,corrSpectrumRaw/corrSpectrumRaw.max(),'g--',linewidth = 3,label = 'Measured')
-        axSpectrum.set_ylim([0,1.05])
     axSpectrum.legend()
     
-    return pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, traceFrequencies,delays, wavelengths
+    return pulseRetrieved, pulseFrequencies         #, traceRetrieved, traceFrequencies, delays, wavelengths, initialGuess, 
+

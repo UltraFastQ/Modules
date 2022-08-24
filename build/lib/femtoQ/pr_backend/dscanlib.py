@@ -26,8 +26,8 @@ def unpack_data(filename,wavelengthLimits):
     
     data = np.load(filename)
     
-    delays = data['dispersion']*1e-3                        # Delays is actually dispersion window thickness
-    wavelengthsSpectro = data['wavelengths']*1e-9           # Kept the same for simplifcity
+    delays = data['dispersion']                             # Delays is actually dispersion window thickness
+    wavelengthsSpectro = data['wavelengths']*1e-9           # Kept the same for simplicity
     trace = data['data']
     trace/= np.max(trace)
     
@@ -64,7 +64,7 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     print('FWHM duration: ' + str( round(get_FWHM(t, np.abs(E_cmp)**2)*1e15,1) ) + ' fs')
     
     plt.figure()
-    plt.plot(t*1e15,np.abs(E)**2 / np.max(np.abs(E)**2),'b',label = 'Retrieved')
+    plt.plot(t*1e15,np.abs(E)**2 / np.max(np.abs(E)**2),'r', linewidth= 2 ,label = 'Retrieved')
     plt.plot(t*1e15,np.abs(E_cmp)**2 / np.max(np.abs(E_cmp)**2),'k',label = 'Transform limit')
     plt.xlabel('Time [fs]')
     plt.ylabel('Power [arb. u.]')
@@ -74,7 +74,7 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     wavelengths = C/(pulseFrequencies)
     II = np.argsort(wavelengths)
     
-    IIplotphase = ( np.abs(pulseRetrieved[II])**2 / np.max(np.abs(pulseRetrieved[II])**2) ) > 0.1
+    IIplotphase = ( np.abs(pulseRetrieved[II])**2 / np.max(np.abs(pulseRetrieved[II])**2) ) > 0.01
     
     plt.figure()
     axL = plt.gca()
@@ -90,14 +90,16 @@ def plot_output(pulseRetrieved, initialGuess, pulseFrequencies, traceRetrieved, 
     
     axR.plot(wavelengths[II][IIplotphase]*1e9,retrievedPhase[II][IIplotphase]/np.pi,'--k')
     axR.set_ylim(retrievedPhase[II][IIplotphase].min()-np.abs(retrievedPhase[II][IIplotphase].min()*0.1)/np.pi,retrievedPhase[II][IIplotphase].max()*1.1/np.pi)
+    axR.set_ylim(-10,10)
     plt.xlim(wavelengthsSpectro[0]*1.8e9,wavelengthsSpectro[-1]*2.2e9)
     
+    
     plt.figure()
-    plt.pcolormesh(delays*1e15,(C/traceFrequencies)*1e9,traceRetrieved.transpose())
+    plt.pcolormesh((C/traceFrequencies)*1e9,delays,traceRetrieved)
     plt.title('Retrieved trace')
-    plt.ylabel('Wavelengths [nm]')
-    plt.xlabel('Delay [fs]')
-    plt.ylim(wavelengthsSpectro[0]*1e9,wavelengthsSpectro[-1]*1e9)
+    plt.xlabel('Wavelengths [nm]')
+    plt.ylabel('Dispersion added [mm of Sapphire]')
+    plt.xlim(wavelengthsSpectro[0]*1e9,wavelengthsSpectro[-1]*1e9)
     plt.colorbar()
 
     return axL
